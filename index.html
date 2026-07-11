@@ -67,10 +67,10 @@
   #inbox { width: 360px; border-right: 1px solid var(--border); overflow-y: auto; background: var(--bg-elev); display:flex; flex-direction:column; }
   .inbox-toolbar { padding: 14px 16px 10px; position: sticky; top:0; background: var(--bg-elev); z-index:2; display:flex; flex-direction:column; gap:8px; }
   .search-box { position: relative; }
-  .search-box svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:14px; height:14px; color: var(--muted-2); }
+  .search-box svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); width:14px; height:14px; color: var(--muted-2); pointer-events:none; }
   .search-box input {
     width:100%; background: var(--panel); border:1px solid var(--border); color: var(--text);
-    border-radius: 8px; padding: 8px 10px 8px 30px; font-size: 13px; font-family: inherit; outline:none; transition: border-color .15s ease;
+    border-radius: 8px; padding: 8px 12px 8px 38px; font-size: 13px; font-family: inherit; outline:none; transition: border-color .15s ease;
   }
   .search-box input:focus { border-color: var(--accent); }
   .filter-row { display:flex; gap:8px; align-items:center; }

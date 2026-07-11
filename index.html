@@ -4,74 +4,234 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AIMS Review Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #0f1115; --panel: #171a21; --border: #2a2f3a; --text: #e6e8ec; --muted: #9aa2b1;
-    --accent: #5b8def; --green: #34c38f; --amber: #f1b44c; --red: #f46a6a; --gray: #6c757d;
+    --bg: #0b0d12; --bg-elev: #12151c; --panel: #171b24; --panel-2: #1d2230; --border: #262c3a; --border-soft: #1e222d;
+    --text: #eef0f4; --muted: #8b93a7; --muted-2: #5f6779;
+    --accent: #6d8bff; --accent-soft: rgba(109,139,255,0.14); --accent-strong: #4f6ee0;
+    --green: #35c98f; --green-soft: rgba(53,201,143,0.14);
+    --amber: #f4b955; --amber-soft: rgba(244,185,85,0.14);
+    --red: #f16d75; --red-soft: rgba(241,109,117,0.14);
+    --gray: #6c7688; --gray-soft: rgba(108,118,136,0.14);
+    --radius: 10px; --radius-sm: 7px;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.25);
+    --shadow-md: 0 8px 24px rgba(0,0,0,0.28);
   }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
-  header { padding: 16px 24px; border-bottom: 1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
-  header h1 { font-size: 18px; margin:0; }
-  header button { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor:pointer; }
-  #layout { display: flex; height: calc(100vh - 57px); }
-  #inbox { width: 340px; border-right: 1px solid var(--border); overflow-y: auto; }
-  .inbox-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; }
-  .inbox-item:hover { background: var(--panel); }
-  .inbox-item.active { background: var(--panel); border-left: 3px solid var(--accent); }
-  .inbox-item .title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-  .badge { display:inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-right: 6px; }
-  .badge.NEWS { background: rgba(244,106,106,0.15); color: var(--red); }
-  .badge.CONTENT_IDEA { background: rgba(91,141,239,0.15); color: var(--accent); }
-  .badge.score { background: rgba(52,195,143,0.15); color: var(--green); }
-  #detail { flex: 1; overflow-y: auto; padding: 28px 36px; }
-  #detail h2 { margin-top: 0; }
-  .slide-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
-  .slide-card .num { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
-  .scores { display:grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 14px 0; }
-  .score-row { display:flex; justify-content:space-between; background: var(--panel); border:1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
-  .section-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 20px 0 8px; }
-  textarea, input[type=text] { width: 100%; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px; font-family: inherit; }
-  .actions { display:flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
-  .actions button { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+  html, body { height: 100%; }
+  body {
+    margin:0; font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 100% -10%, rgba(109,139,255,0.06), transparent),
+                var(--bg);
+    color: var(--text); -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    padding: 14px 26px; border-bottom: 1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between; gap: 20px;
+    background: rgba(18,21,28,0.85); backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand { display:flex; align-items:center; gap: 10px; }
+  .brand .mark {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #9a7bff);
+    display:flex; align-items:center; justify-content:center;
+    font-size: 14px; font-weight: 800; color: #0b0d12; letter-spacing: -0.5px;
+    box-shadow: var(--shadow-sm);
+  }
+  header h1 { font-size: 16px; margin:0; font-weight: 700; letter-spacing: -0.01em; }
+  header .subtitle { font-size: 11px; color: var(--muted-2); margin-top: 1px; }
+  .header-right { display:flex; align-items:center; gap: 14px; }
+  .tabs { display:flex; gap:4px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
+  .tab-btn {
+    background:transparent; border:none; color: var(--muted); padding: 7px 16px; border-radius: 999px;
+    cursor:pointer; font-size:13px; font-weight: 600; font-family: inherit; transition: all .15s ease;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+  .icon-btn {
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted); width: 34px; height: 34px;
+    border-radius: 8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition: all .15s ease;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  /* ---------- Layout ---------- */
+  #layout { display: flex; height: calc(100vh - 61px); }
+  #inbox { width: 360px; border-right: 1px solid var(--border); overflow-y: auto; background: var(--bg-elev); display:flex; flex-direction:column; }
+  .inbox-toolbar { padding: 14px 16px 10px; position: sticky; top:0; background: var(--bg-elev); z-index:2; }
+  .search-box { position: relative; }
+  .search-box svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:14px; height:14px; color: var(--muted-2); }
+  .search-box input {
+    width:100%; background: var(--panel); border:1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 10px 8px 30px; font-size: 13px; font-family: inherit; outline:none; transition: border-color .15s ease;
+  }
+  .search-box input:focus { border-color: var(--accent); }
+  .inbox-count { color: var(--muted-2); font-size: 11px; padding: 6px 16px 4px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+  .inbox-list { flex: 1; overflow-y: auto; padding: 4px 10px 16px; }
+
+  .inbox-item {
+    padding: 13px 14px; border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 6px;
+    border: 1px solid transparent; transition: all .15s ease;
+  }
+  .inbox-item:hover { background: var(--panel); border-color: var(--border); }
+  .inbox-item.active { background: var(--panel-2); border-color: var(--accent); box-shadow: var(--shadow-sm); }
+  .inbox-item .title { font-size: 13.5px; font-weight: 600; margin-bottom: 8px; line-height: 1.4; color: var(--text); }
+  .inbox-item .meta-row { display:flex; align-items:center; gap: 6px; flex-wrap: wrap; }
+
+  .badge {
+    display:inline-flex; align-items:center; gap:4px; font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+    padding: 3px 9px; border-radius: 999px; text-transform: uppercase;
+  }
+  .badge.NEWS { background: var(--red-soft); color: var(--red); }
+  .badge.CONTENT_IDEA { background: var(--accent-soft); color: var(--accent); }
+  .badge.score { background: var(--green-soft); color: var(--green); }
+  .badge.plain { background: var(--gray-soft); color: var(--gray); }
+
+  #detail { flex: 1; overflow-y: auto; padding: 32px 44px 60px; max-width: 880px; }
+  #detail h2 { margin: 0 0 10px; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+  .status-line { color: var(--muted); font-size: 12.5px; margin: 10px 0 4px; }
+  .warn-note {
+    color: var(--amber); background: var(--amber-soft); border: 1px solid rgba(244,185,85,0.3);
+    padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; margin-top: 14px; display:flex; gap:8px; align-items:flex-start;
+  }
+
+  .slide-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px;
+    margin-bottom: 10px; transition: border-color .15s ease;
+  }
+  .slide-card:hover { border-color: var(--border-soft); }
+  .slide-card .num {
+    color: var(--accent); font-size: 11px; margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .slide-card .body { font-size: 14px; line-height: 1.55; }
+
+  .scores { display:grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 14px 0; }
+  .score-row {
+    background: var(--panel); border:1px solid var(--border); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12.5px;
+  }
+  .score-row .score-head { display:flex; justify-content:space-between; margin-bottom: 6px; text-transform: capitalize; color: var(--muted); }
+  .score-row .score-head strong { color: var(--text); font-size: 13px; }
+  .score-bar-track { height: 5px; border-radius: 999px; background: var(--border); overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), #9a7bff); }
+
+  .section-label {
+    color: var(--muted-2); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 700;
+    margin: 28px 0 10px; display:flex; align-items:center; gap: 8px;
+  }
+  .section-label::after { content:''; flex:1; height:1px; background: var(--border-soft); }
+
+  textarea, input[type=text] {
+    width: 100%; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm);
+    padding: 10px 12px; font-family: inherit; font-size: 13.5px; outline: none; transition: border-color .15s ease;
+  }
+  textarea:focus, input[type=text]:focus { border-color: var(--accent); }
+
+  .actions { display:flex; gap: 10px; margin-top: 26px; flex-wrap: wrap; }
+  .actions button {
+    padding: 9px 18px; border-radius: var(--radius-sm); border: 1px solid transparent; cursor: pointer;
+    font-size: 13px; font-weight: 700; font-family: inherit; transition: transform .1s ease, filter .15s ease;
+    display:flex; align-items:center; gap: 6px;
+  }
+  .actions button:hover { filter: brightness(1.08); }
+  .actions button:active { transform: scale(0.97); }
   .btn-approve { background: var(--green); color: #04241a; }
   .btn-revise { background: var(--amber); color: #3a2600; }
   .btn-reject { background: var(--red); color: #3a0a0a; }
-  .btn-archive { background: var(--gray); color: #fff; }
+  .btn-archive { background: var(--panel-2); color: var(--text); border-color: var(--border); }
   .btn-download { background: var(--accent); color: #fff; }
-  #empty, #config-warning { padding: 40px; color: var(--muted); }
-  #config-warning { color: var(--amber); }
-  .caption-box { white-space: pre-wrap; background: var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px 16px; font-size: 14px; line-height: 1.5; }
-  .revise-note { display:none; margin-top: 10px; }
-  a.source-link { color: var(--accent); }
-  .tabs { display:flex; gap:4px; margin-left: 20px; }
-  .tab-btn { background:transparent; border:1px solid var(--border); color: var(--muted); padding: 5px 14px; border-radius:6px; cursor:pointer; font-size:13px; }
-  .tab-btn.active { background: var(--panel); color: var(--text); border-color: var(--accent); }
-  .outline-item { display:flex; gap:10px; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px; }
-  .outline-item .num { color: var(--muted); min-width: 20px; }
-  .learning-card { background: var(--panel); border:1px solid var(--border); border-radius:8px; padding:16px 18px; margin-bottom:14px; }
-  .learning-card h3 { margin:0 0 8px; font-size:14px; }
-  .learning-card .period { color: var(--muted); font-size:12px; margin-bottom:10px; }
-  .perf-list { font-size:13px; margin: 6px 0; padding-left: 18px; }
+
+  #empty, #config-warning {
+    padding: 60px 30px; color: var(--muted); text-align:center; font-size: 13.5px;
+  }
+  #empty { display:flex; flex-direction:column; align-items:center; gap: 10px; }
+  #empty svg { width: 40px; height: 40px; color: var(--muted-2); opacity: .6; }
+  #config-warning { color: var(--amber); text-align:left; background: var(--amber-soft); margin: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(244,185,85,0.3); }
+
+  .caption-box {
+    white-space: pre-wrap; background: var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px 18px; font-size: 13.5px; line-height: 1.6; color: var(--text);
+  }
+  .revise-note { display:none; margin-top: 12px; }
+  a.source-link { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
+  a.source-link:hover { text-decoration: underline; }
+
+  .outline-item { display:flex; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-soft); font-size:13px; align-items:baseline; }
+  .outline-item:last-child { border-bottom: none; }
+  .outline-item .num {
+    color: var(--muted); min-width: 22px; font-weight: 700; font-size: 11.5px;
+    background: var(--panel-2); border-radius: 5px; padding: 2px 6px; text-align:center;
+  }
+
+  .learning-card {
+    background: var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:14px;
+  }
+  .learning-card h3 { margin:14px 0 8px; font-size:13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .learning-card h3:first-of-type { margin-top: 4px; }
+  .learning-card .period {
+    color: var(--text); font-size:13px; margin-bottom:4px; font-weight: 700; display:flex; align-items:center; gap:8px;
+  }
+  .perf-list { font-size:13px; margin: 4px 0; padding-left: 20px; color: var(--text); line-height: 1.7; }
+
+  .loading-row { padding:20px; color:var(--muted); font-size: 13px; display:flex; align-items:center; gap:10px; }
+  .spinner {
+    width:14px; height:14px; border-radius:50%; border: 2px solid var(--border); border-top-color: var(--accent);
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  ::-webkit-scrollbar-track { background: transparent; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>AIMS Review Hub</h1>
-  <div class="tabs">
-    <button class="tab-btn active" id="tab-inbox" onclick="switchTab('inbox')">Inbox</button>
-    <button class="tab-btn" id="tab-insights" onclick="switchTab('insights')">Insights</button>
+  <div class="brand">
+    <div class="mark">A</div>
+    <div>
+      <h1>AIMS Review Hub</h1>
+      <div class="subtitle">S7 &middot; Content Review &amp; Approval</div>
+    </div>
   </div>
-  <button onclick="switchTab(currentTab)">Reload</button>
+  <div class="header-right">
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-inbox" onclick="switchTab('inbox')">Inbox</button>
+      <button class="tab-btn" id="tab-insights" onclick="switchTab('insights')">Insights</button>
+    </div>
+    <button class="icon-btn" title="Reload" onclick="switchTab(currentTab)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"></path></svg>
+    </button>
+  </div>
 </header>
 
 <div id="layout">
-  <div id="inbox"><div id="config-warning" style="display:none;">Isi SUPABASE_URL &amp; SUPABASE_ANON_KEY di bagian &lt;script&gt; sebelum host file ini.</div></div>
-  <div id="detail"><div id="empty">Pilih konten di sebelah kiri untuk mulai review.</div></div>
+  <div id="inbox">
+    <div id="config-warning" style="display:none;">Isi SUPABASE_URL &amp; SUPABASE_ANON_KEY di bagian &lt;script&gt; sebelum host file ini.</div>
+    <div class="inbox-toolbar">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="search-input" placeholder="Cari judul konten..." oninput="renderInboxList()">
+      </div>
+    </div>
+    <div class="inbox-count" id="inbox-count"></div>
+    <div class="inbox-list" id="inbox-list"></div>
+  </div>
+  <div id="detail">
+    <div id="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+      Pilih konten di sebelah kiri untuk mulai review.
+    </div>
+  </div>
 </div>
-<div id="insights-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 57px);"></div>
+<div id="insights-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);"></div>
 
 <script>
 // ====== KONFIGURASI — ISI SEBELUM DEPLOY ======
@@ -95,7 +255,7 @@ function switchTab(tab) {
 
 async function loadInsights() {
   const el = document.getElementById('insights-view');
-  el.innerHTML = '<div style="padding:20px;color:var(--muted);">Memuat...</div>';
+  el.innerHTML = '<div class="loading-row"><span class="spinner"></span> Memuat...</div>';
   const { data, error } = await sb.schema('s11').from('learning_notes').select('*').order('created_at', { ascending: false }).limit(20);
   if (error) { el.innerHTML = '<div style="color:var(--red);">Gagal memuat: ' + esc(error.message) + '</div>'; return; }
   if (!data || data.length === 0) { el.innerHTML = '<div style="color:var(--muted);">Belum ada learning_notes. S11 System Learning jalan mingguan (Senin 08:00) — cek lagi setelah run pertama.</div>'; return; }
@@ -104,7 +264,7 @@ async function loadInsights() {
     const top = (n.top_performers || []).map(p => '<li>' + esc(p.title || p.content_item_id) + ' — ' + esc(p.hipotesis || '') + '</li>').join('');
     const low = (n.low_performers || []).map(p => '<li>' + esc(p.title || p.content_item_id) + ' — ' + esc(p.hipotesis || '') + '</li>').join('');
     return '<div class="learning-card">' +
-      '<div class="period">' + esc(n.period_start) + ' &ndash; ' + esc(n.period_end) + (n.applied ? ' · <span style="color:var(--green)">sudah diterapkan</span>' : '') + '</div>' +
+      '<div class="period">' + esc(n.period_start) + ' &ndash; ' + esc(n.period_end) + (n.applied ? ' <span class="badge score">sudah diterapkan</span>' : '') + '</div>' +
       '<h3>Top performer</h3><ul class="perf-list">' + (top || '<li>-</li>') + '</ul>' +
       '<h3>Perlu perhatian</h3><ul class="perf-list">' + (low || '<li>-</li>') + '</ul>' +
       '<h3>Saran</h3><div class="caption-box">' + esc(n.suggestions) + '</div>' +
@@ -119,11 +279,13 @@ function esc(s) {
 }
 
 async function loadInbox() {
-  const inboxEl = document.getElementById('inbox');
+  const listEl = document.getElementById('inbox-list');
+  const countEl = document.getElementById('inbox-count');
   if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === 'ISI_ANON_KEY_DI_SINI') {
     document.getElementById('config-warning').style.display = 'block';
   }
-  inboxEl.innerHTML = '<div style="padding:20px;color:var(--muted);">Memuat...</div>';
+  countEl.textContent = '';
+  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Memuat...</div>';
 
   // Tabel sekarang tersebar di 1 schema per tahap (s2=topic_labels, s3=topic_scores,
   // s4=content_items, s5=carousel_drafts, s6=visual_briefs, s1=raw_sources) — PostgREST
@@ -136,7 +298,7 @@ async function loadInbox() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    inboxEl.innerHTML = '<div style="padding:20px;color:var(--red);">Gagal memuat: ' + esc(error.message) + '</div>';
+    listEl.innerHTML = '<div style="padding:20px;color:var(--red);">Gagal memuat: ' + esc(error.message) + '</div>';
     return;
   }
 
@@ -164,7 +326,7 @@ async function loadInbox() {
   ]);
 
   if (draftErr || rawErr || scoreErr || labelErr || briefErr) {
-    inboxEl.innerHTML = '<div style="padding:20px;color:var(--red);">Gagal memuat data pendukung: ' + esc((draftErr || rawErr || scoreErr || labelErr || briefErr).message) + '</div>';
+    listEl.innerHTML = '<div style="padding:20px;color:var(--red);">Gagal memuat data pendukung: ' + esc((draftErr || rawErr || scoreErr || labelErr || briefErr).message) + '</div>';
     return;
   }
 
@@ -191,26 +353,45 @@ async function loadInbox() {
     };
   });
 
+  renderInboxList();
+}
+
+function renderInboxList() {
+  const listEl = document.getElementById('inbox-list');
+  const countEl = document.getElementById('inbox-count');
+  const q = (document.getElementById('search-input').value || '').toLowerCase().trim();
+  const filtered = q ? items.filter(it => (it.title || '').toLowerCase().includes(q)) : items;
+
   if (items.length === 0) {
-    inboxEl.innerHTML = '<div style="padding:20px;color:var(--muted);">Tidak ada konten ready_for_review.</div>';
+    countEl.textContent = '';
+    listEl.innerHTML = '<div class="loading-row" style="color:var(--muted);"><span>Tidak ada konten ready_for_review.</span></div>';
     return;
   }
 
-  inboxEl.innerHTML = items.map(it => {
+  countEl.textContent = filtered.length + ' konten menunggu review';
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div class="loading-row" style="color:var(--muted);"><span>Tidak ada hasil untuk pencarian ini.</span></div>';
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(it => {
     const ts = it.raw_sources && it.raw_sources.topic_scores;
-    const category = ts ? ts.category : '-';
+    const category = ts ? ts.category : null;
     const score = ts ? ts.total_score : '-';
     return '<div class="inbox-item' + (it.id === activeId ? ' active' : '') + '" onclick="showDetail(\'' + it.id + '\')">' +
       '<div class="title">' + esc(it.title || '(tanpa judul)') + '</div>' +
-      '<span class="badge ' + esc(category) + '">' + esc(category) + '</span>' +
+      '<div class="meta-row">' +
+      '<span class="badge ' + esc(category || 'plain') + '">' + esc(category || 'tanpa kategori') + '</span>' +
       '<span class="badge score">skor ' + esc(score) + '</span>' +
+      '</div>' +
       '</div>';
   }).join('');
 }
 
 function showDetail(id) {
   activeId = id;
-  loadInbox(); // refresh highlight state cheaply (re-fetch acceptable at V0.1 scale)
+  renderInboxList(); // refresh highlight state cheaply
   const it = items.find(x => x.id === id);
   const detailEl = document.getElementById('detail');
   if (!it) { detailEl.innerHTML = '<div id="empty">Konten tidak ditemukan.</div>'; return; }
@@ -223,18 +404,22 @@ function showDetail(id) {
   const dims = ['relevance','timeliness','audience_fit','originality','visual_potential','brand_safety','engagement_potential'];
   const scoreRows = dims.map(d => {
     const val = ts['score_' + d];
-    return '<div class="score-row"><span>' + d.replace(/_/g, ' ') + '</span><strong>' + (val == null ? '-' : val) + '</strong></div>';
+    const pct = val == null ? 0 : Math.max(0, Math.min(100, Number(val) * 10));
+    return '<div class="score-row">' +
+      '<div class="score-head"><span>' + d.replace(/_/g, ' ') + '</span><strong>' + (val == null ? '-' : val) + '</strong></div>' +
+      '<div class="score-bar-track"><div class="score-bar-fill" style="width:' + pct + '%;"></div></div>' +
+      '</div>';
   }).join('');
 
   detailEl.innerHTML =
     '<h2>' + esc(it.title) + '</h2>' +
-    '<div><span class="badge ' + esc(ts.category || '') + '">' + esc(ts.category || '-') + '</span>' +
+    '<div><span class="badge ' + esc(ts.category || 'plain') + '">' + esc(ts.category || '-') + '</span> ' +
     '<span class="badge score">total ' + esc(ts.total_score) + '</span></div>' +
-    (draft.needs_revision_note ? '<p style="color:var(--amber);margin-top:10px;">⚠ ' + esc(draft.needs_revision_note) + '</p>' : '') +
-    '<p style="color:var(--muted);">Status: ' + esc(it.status) + '</p>' +
+    (draft.needs_revision_note ? '<div class="warn-note">⚠ ' + esc(draft.needs_revision_note) + '</div>' : '') +
+    '<p class="status-line">Status: ' + esc(it.status) + '</p>' +
 
     '<div class="section-label">Rencana Konten (S4 Planning)</div>' +
-    '<p style="color:var(--muted);margin-bottom:8px;"><em>Angle:</em> ' + esc(it.angle || '-') + '</p>' +
+    '<p style="color:var(--muted);margin-bottom:10px;font-size:13.5px;"><em>Angle:</em> ' + esc(it.angle || '-') + '</p>' +
     (it.outline || []).map(o => '<div class="outline-item"><span class="num">' + esc(o.slide_number) + '</span><span>' + esc(o.purpose) + '</span></div>').join('') +
 
     '<div class="section-label">Hooks</div>' +
@@ -243,8 +428,8 @@ function showDetail(id) {
     '<div class="section-label">Slides</div>' +
     slides.map(s => {
       const vb = (draft.visual_brief || []).find(b => b.slide_number === s.slide_number);
-      const vbLine = vb ? '<div style="color:var(--muted);font-size:12px;margin-top:6px;">layout: ' + esc(vb.layout) + ' &middot; image: ' + esc(vb.image_cue) + ' &middot; <span style="color:' + esc(vb.accent_color) + '">' + esc(vb.accent_color) + '</span></div>' : '';
-      return '<div class="slide-card"><div class="num">Slide ' + esc(s.slide_number) + '</div>' + esc(s.text) + vbLine + '</div>';
+      const vbLine = vb ? '<div style="color:var(--muted);font-size:12px;margin-top:8px;">layout: ' + esc(vb.layout) + ' &middot; image: ' + esc(vb.image_cue) + ' &middot; <span style="color:' + esc(vb.accent_color) + '">' + esc(vb.accent_color) + '</span></div>' : '';
+      return '<div class="slide-card"><div class="num">Slide ' + esc(s.slide_number) + '</div><div class="body">' + esc(s.text) + '</div>' + vbLine + '</div>';
     }).join('') +
 
     '<div class="section-label">Caption &amp; CTA</div>' +
@@ -252,14 +437,14 @@ function showDetail(id) {
 
     '<div class="section-label">Source Note</div>' +
     '<div class="caption-box">' + esc(draft.source_note) + '</div>' +
-    (it.raw_sources && it.raw_sources.url ? '<p><a class="source-link" href="' + esc(it.raw_sources.url) + '" target="_blank">Sumber asli →</a></p>' : '') +
+    (it.raw_sources && it.raw_sources.url ? '<p style="margin-top:10px;"><a class="source-link" href="' + esc(it.raw_sources.url) + '" target="_blank">Sumber asli →</a></p>' : '') +
 
     '<div class="section-label">Breakdown Skor (alasan: ' + esc(ts.reason || '-') + ')</div>' +
     '<div class="scores">' + scoreRows + '</div>' +
 
     '<div class="section-label">Riwayat Tahap (S1&ndash;S11)</div>' +
     '<div id="stage-history-' + it.id + '">' +
-      '<div style="color:var(--muted);font-size:12px;">Memuat riwayat...</div>' +
+      '<div class="loading-row"><span class="spinner"></span> Memuat riwayat...</div>' +
     '</div>' +
 
     '<textarea id="revise-note-' + it.id + '" class="revise-note" placeholder="Catatan revisi (wajib diisi)" rows="3"></textarea>' +
@@ -300,7 +485,7 @@ async function doAction(contentItemId, action, note) {
     });
   }
   activeId = null;
-  document.getElementById('detail').innerHTML = '<div id="empty">Aksi tersimpan. Pilih konten lain.</div>';
+  document.getElementById('detail').innerHTML = '<div id="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>Aksi tersimpan. Pilih konten lain.</div>';
   loadInbox();
 }
 

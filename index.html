@@ -65,7 +65,7 @@
   /* ---------- Layout ---------- */
   #layout { display: flex; height: calc(100vh - 61px); }
   #inbox { width: 360px; border-right: 1px solid var(--border); overflow-y: auto; background: var(--bg-elev); display:flex; flex-direction:column; }
-  .inbox-toolbar { padding: 14px 16px 10px; position: sticky; top:0; background: var(--bg-elev); z-index:2; }
+  .inbox-toolbar { padding: 14px 16px 10px; position: sticky; top:0; background: var(--bg-elev); z-index:2; display:flex; flex-direction:column; gap:8px; }
   .search-box { position: relative; }
   .search-box svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:14px; height:14px; color: var(--muted-2); }
   .search-box input {
@@ -73,6 +73,12 @@
     border-radius: 8px; padding: 8px 10px 8px 30px; font-size: 13px; font-family: inherit; outline:none; transition: border-color .15s ease;
   }
   .search-box input:focus { border-color: var(--accent); }
+  .filter-row { display:flex; gap:8px; align-items:center; }
+  .filter-row select {
+    flex: 1; background: var(--panel); border:1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 7px 10px; font-size: 12.5px; font-family: inherit; outline:none; cursor:pointer; transition: border-color .15s ease;
+  }
+  .filter-row select:focus { border-color: var(--accent); }
   .inbox-count { color: var(--muted-2); font-size: 11px; padding: 6px 16px 4px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
   .inbox-list { flex: 1; overflow-y: auto; padding: 4px 10px 16px; }
 
@@ -220,6 +226,18 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <input type="text" id="search-input" placeholder="Cari judul konten..." oninput="renderInboxList()">
       </div>
+      <div class="filter-row">
+        <select id="category-filter" onchange="renderInboxList()">
+          <option value="">Semua kategori</option>
+          <option value="NEWS">NEWS</option>
+          <option value="CONTENT_IDEA">CONTENT_IDEA</option>
+        </select>
+        <select id="sort-order" onchange="renderInboxList()">
+          <option value="score_desc">Skor: tertinggi</option>
+          <option value="score_asc">Skor: terendah</option>
+          <option value="newest">Terbaru</option>
+        </select>
+      </div>
     </div>
     <div class="inbox-count" id="inbox-count"></div>
     <div class="inbox-list" id="inbox-list"></div>
@@ -356,11 +374,30 @@ async function loadInbox() {
   renderInboxList();
 }
 
+function getCategory(it) {
+  const ts = it.raw_sources && it.raw_sources.topic_scores;
+  return ts ? ts.category : null;
+}
+
+function getScore(it) {
+  const ts = it.raw_sources && it.raw_sources.topic_scores;
+  const val = ts ? ts.total_score : null;
+  return val == null ? -Infinity : Number(val);
+}
+
 function renderInboxList() {
   const listEl = document.getElementById('inbox-list');
   const countEl = document.getElementById('inbox-count');
   const q = (document.getElementById('search-input').value || '').toLowerCase().trim();
-  const filtered = q ? items.filter(it => (it.title || '').toLowerCase().includes(q)) : items;
+  const categoryFilter = document.getElementById('category-filter').value;
+  const sortOrder = document.getElementById('sort-order').value;
+
+  let filtered = q ? items.filter(it => (it.title || '').toLowerCase().includes(q)) : items.slice();
+  if (categoryFilter) filtered = filtered.filter(it => getCategory(it) === categoryFilter);
+
+  if (sortOrder === 'score_desc') filtered.sort((a, b) => getScore(b) - getScore(a));
+  else if (sortOrder === 'score_asc') filtered.sort((a, b) => getScore(a) - getScore(b));
+  // 'newest' keeps the created_at desc order already returned by the query
 
   if (items.length === 0) {
     countEl.textContent = '';
@@ -371,14 +408,13 @@ function renderInboxList() {
   countEl.textContent = filtered.length + ' konten menunggu review';
 
   if (filtered.length === 0) {
-    listEl.innerHTML = '<div class="loading-row" style="color:var(--muted);"><span>Tidak ada hasil untuk pencarian ini.</span></div>';
+    listEl.innerHTML = '<div class="loading-row" style="color:var(--muted);"><span>Tidak ada hasil untuk filter/pencarian ini.</span></div>';
     return;
   }
 
   listEl.innerHTML = filtered.map(it => {
-    const ts = it.raw_sources && it.raw_sources.topic_scores;
-    const category = ts ? ts.category : null;
-    const score = ts ? ts.total_score : '-';
+    const category = getCategory(it);
+    const score = it.raw_sources && it.raw_sources.topic_scores ? it.raw_sources.topic_scores.total_score : '-';
     return '<div class="inbox-item' + (it.id === activeId ? ' active' : '') + '" onclick="showDetail(\'' + it.id + '\')">' +
       '<div class="title">' + esc(it.title || '(tanpa judul)') + '</div>' +
       '<div class="meta-row">' +

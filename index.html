@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIMS Review Hub</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #2a2f3a; --text: #e6e8ec; --muted: #9aa2b1;
+    --accent: #5b8def; --green: #34c38f; --amber: #f1b44c; --red: #f46a6a; --gray: #6c757d;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 16px 24px; border-bottom: 1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size: 18px; margin:0; }
+  header button { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor:pointer; }
+  #layout { display: flex; height: calc(100vh - 57px); }
+  #inbox { width: 340px; border-right: 1px solid var(--border); overflow-y: auto; }
+  .inbox-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .inbox-item:hover { background: var(--panel); }
+  .inbox-item.active { background: var(--panel); border-left: 3px solid var(--accent); }
+  .inbox-item .title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .badge { display:inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-right: 6px; }
+  .badge.NEWS { background: rgba(244,106,106,0.15); color: var(--red); }
+  .badge.CONTENT_IDEA { background: rgba(91,141,239,0.15); color: var(--accent); }
+  .badge.score { background: rgba(52,195,143,0.15); color: var(--green); }
+  #detail { flex: 1; overflow-y: auto; padding: 28px 36px; }
+  #detail h2 { margin-top: 0; }
+  .slide-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+  .slide-card .num { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .scores { display:grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 14px 0; }
+  .score-row { display:flex; justify-content:space-between; background: var(--panel); border:1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+  .section-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 20px 0 8px; }
+  textarea, input[type=text] { width: 100%; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px; font-family: inherit; }
+  .actions { display:flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+  .actions button { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn-approve { background: var(--green); color: #04241a; }
+  .btn-revise { background: var(--amber); color: #3a2600; }
+  .btn-reject { background: var(--red); color: #3a0a0a; }
+  .btn-archive { background: var(--gray); color: #fff; }
+  .btn-download { background: var(--accent); color: #fff; }
+  #empty, #config-warning { padding: 40px; color: var(--muted); }
+  #config-warning { color: var(--amber); }
+  .caption-box { white-space: pre-wrap; background: var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px 16px; font-size: 14px; line-height: 1.5; }
+  .revise-note { display:none; margin-top: 10px; }
+  a.source-link { color: var(--accent); }
+  .tabs { display:flex; gap:4px; margin-left: 20px; }
+  .tab-btn { background:transparent; border:1px solid var(--border); color: var(--muted); padding: 5px 14px; border-radius:6px; cursor:pointer; font-size:13px; }
+  .tab-btn.active { background: var(--panel); color: var(--text); border-color: var(--accent); }
+  .outline-item { display:flex; gap:10px; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px; }
+  .outline-item .num { color: var(--muted); min-width: 20px; }
+  .learning-card { background: var(--panel); border:1px solid var(--border); border-radius:8px; padding:16px 18px; margin-bottom:14px; }
+  .learning-card h3 { margin:0 0 8px; font-size:14px; }
+  .learning-card .period { color: var(--muted); font-size:12px; margin-bottom:10px; }
+  .perf-list { font-size:13px; margin: 6px 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AIMS Review Hub</h1>
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-inbox" onclick="switchTab('inbox')">Inbox</button>
+    <button class="tab-btn" id="tab-insights" onclick="switchTab('insights')">Insights</button>
+  </div>
+  <button onclick="switchTab(currentTab)">Reload</button>
+</header>
+
+<div id="layout">
+  <div id="inbox"><div id="config-warning" style="display:none;">Isi SUPABASE_URL &amp; SUPABASE_ANON_KEY di bagian &lt;script&gt; sebelum host file ini.</div></div>
+  <div id="detail"><div id="empty">Pilih konten di sebelah kiri untuk mulai review.</div></div>
+</div>
+<div id="insights-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 57px);"></div>
+
+<script>
+// ====== KONFIGURASI — ISI SEBELUM DEPLOY ======
+const SUPABASE_URL = 'https://vjpodskxeogtthexksfy.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqcG9kc2t4ZW9ndHRoZXhrc2Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MDQzMDAsImV4cCI6MjA5ODM4MDMwMH0.DsWmzFFL4FzuwPS8Ya9_YgnDHQBcqcubqMSGW60Q2SE';
+// ================================================
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let items = [];
+let activeId = null;
+let currentTab = 'inbox';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-inbox').classList.toggle('active', tab === 'inbox');
+  document.getElementById('tab-insights').classList.toggle('active', tab === 'insights');
+  document.getElementById('layout').style.display = tab === 'inbox' ? 'flex' : 'none';
+  document.getElementById('insights-view').style.display = tab === 'insights' ? 'block' : 'none';
+  if (tab === 'inbox') loadInbox(); else loadInsights();
+}
+
+async function loadInsights() {
+  const el = document.getElementById('insights-view');
+  el.innerHTML = '<div style="padding:20px;color:var(--muted);">Memuat...</div>';
+  const { data, error } = await sb.schema('s11').from('learning_notes').select('*').order('created_at', { ascending: false }).limit(20);
+  if (error) { el.innerHTML = '<div style="color:var(--red);">Gagal memuat: ' + esc(error.message) + '</div>'; return; }
+  if (!data || data.length === 0) { el.innerHTML = '<div style="color:var(--muted);">Belum ada learning_notes. S11 System Learning jalan mingguan (Senin 08:00) — cek lagi setelah run pertama.</div>'; return; }
+
+  el.innerHTML = data.map(n => {
+    const top = (n.top_performers || []).map(p => '<li>' + esc(p.title || p.content_item_id) + ' — ' + esc(p.hipotesis || '') + '</li>').join('');
+    const low = (n.low_performers || []).map(p => '<li>' + esc(p.title || p.content_item_id) + ' — ' + esc(p.hipotesis || '') + '</li>').join('');
+    return '<div class="learning-card">' +
+      '<div class="period">' + esc(n.period_start) + ' &ndash; ' + esc(n.period_end) + (n.applied ? ' · <span style="color:var(--green)">sudah diterapkan</span>' : '') + '</div>' +
+      '<h3>Top performer</h3><ul class="perf-list">' + (top || '<li>-</li>') + '</ul>' +
+      '<h3>Perlu perhatian</h3><ul class="perf-list">' + (low || '<li>-</li>') + '</ul>' +
+      '<h3>Saran</h3><div class="caption-box">' + esc(n.suggestions) + '</div>' +
+      '</div>';
+  }).join('');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.innerText = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+async function loadInbox() {
+  const inboxEl = document.getElementById('inbox');
+  if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === 'ISI_ANON_KEY_DI_SINI') {
+    document.getElementById('config-warning').style.display = 'block';
+  }
+  inboxEl.innerHTML = '<div style="padding:20px;color:var(--muted);">Memuat...</div>';
+
+  // Tabel sekarang tersebar di 1 schema per tahap (s2=topic_labels, s3=topic_scores,
+  // s4=content_items, s5=carousel_drafts, s6=visual_briefs, s1=raw_sources) — PostgREST
+  // nested-embed cross-schema tidak diandalkan, jadi query terpisah lalu digabung manual di JS.
+  const { data: ciData, error } = await sb
+    .schema('s4')
+    .from('content_items')
+    .select('*')
+    .eq('status', 'ready_for_review')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    inboxEl.innerHTML = '<div style="padding:20px;color:var(--red);">Gagal memuat: ' + esc(error.message) + '</div>';
+    return;
+  }
+
+  const contentItemIds = (ciData || []).map(i => i.id);
+  const rawSourceIds = [...new Set((ciData || []).map(i => i.raw_source_id).filter(Boolean))];
+
+  const [{ data: drafts, error: draftErr }, { data: raws, error: rawErr }, { data: briefs, error: briefErr }] = await Promise.all([
+    contentItemIds.length
+      ? sb.schema('s5').from('carousel_drafts').select('*').in('content_item_id', contentItemIds)
+      : Promise.resolve({ data: [] }),
+    rawSourceIds.length
+      ? sb.schema('s1').from('raw_sources').select('id, url, published_at').in('id', rawSourceIds)
+      : Promise.resolve({ data: [] }),
+    contentItemIds.length
+      ? sb.schema('s6').from('visual_briefs').select('*').in('content_item_id', contentItemIds)
+      : Promise.resolve({ data: [] })
+  ]);
+  const [{ data: scores, error: scoreErr }, { data: labels, error: labelErr }] = await Promise.all([
+    rawSourceIds.length
+      ? sb.schema('s3').from('topic_scores').select('*').in('raw_source_id', rawSourceIds)
+      : Promise.resolve({ data: [] }),
+    rawSourceIds.length
+      ? sb.schema('s2').from('topic_labels').select('*').in('raw_source_id', rawSourceIds)
+      : Promise.resolve({ data: [] })
+  ]);
+
+  if (draftErr || rawErr || scoreErr || labelErr || briefErr) {
+    inboxEl.innerHTML = '<div style="padding:20px;color:var(--red);">Gagal memuat data pendukung: ' + esc((draftErr || rawErr || scoreErr || labelErr || briefErr).message) + '</div>';
+    return;
+  }
+
+  const draftByItem = Object.fromEntries((drafts || []).map(d => [d.content_item_id, d]));
+  const rawById = Object.fromEntries((raws || []).map(r => [r.id, r]));
+  const scoreByRaw = Object.fromEntries((scores || []).map(s => [s.raw_source_id, s]));
+  const labelByRaw = Object.fromEntries((labels || []).map(l => [l.raw_source_id, l]));
+  const briefByItem = Object.fromEntries((briefs || []).map(b => [b.content_item_id, b]));
+
+  items = (ciData || []).map(it => {
+    const draft = draftByItem[it.id];
+    const visualBrief = briefByItem[it.id];
+    return {
+      ...it,
+      carousel_drafts: draft ? [{ ...draft, visual_brief: visualBrief ? visualBrief.visual_brief : null }] : [],
+      raw_sources: rawById[it.raw_source_id]
+        ? {
+            ...rawById[it.raw_source_id],
+            topic_scores: scoreByRaw[it.raw_source_id]
+              ? { ...scoreByRaw[it.raw_source_id], category: labelByRaw[it.raw_source_id] ? labelByRaw[it.raw_source_id].category : null }
+              : null
+          }
+        : null
+    };
+  });
+
+  if (items.length === 0) {
+    inboxEl.innerHTML = '<div style="padding:20px;color:var(--muted);">Tidak ada konten ready_for_review.</div>';
+    return;
+  }
+
+  inboxEl.innerHTML = items.map(it => {
+    const ts = it.raw_sources && it.raw_sources.topic_scores;
+    const category = ts ? ts.category : '-';
+    const score = ts ? ts.total_score : '-';
+    return '<div class="inbox-item' + (it.id === activeId ? ' active' : '') + '" onclick="showDetail(\'' + it.id + '\')">' +
+      '<div class="title">' + esc(it.title || '(tanpa judul)') + '</div>' +
+      '<span class="badge ' + esc(category) + '">' + esc(category) + '</span>' +
+      '<span class="badge score">skor ' + esc(score) + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+function showDetail(id) {
+  activeId = id;
+  loadInbox(); // refresh highlight state cheaply (re-fetch acceptable at V0.1 scale)
+  const it = items.find(x => x.id === id);
+  const detailEl = document.getElementById('detail');
+  if (!it) { detailEl.innerHTML = '<div id="empty">Konten tidak ditemukan.</div>'; return; }
+
+  const draft = it.carousel_drafts && it.carousel_drafts[0] ? it.carousel_drafts[0] : {};
+  const ts = it.raw_sources && it.raw_sources.topic_scores ? it.raw_sources.topic_scores : {};
+  const slides = draft.slides || [];
+  const hooks = draft.hooks || [];
+
+  const dims = ['relevance','timeliness','audience_fit','originality','visual_potential','brand_safety','engagement_potential'];
+  const scoreRows = dims.map(d => {
+    const val = ts['score_' + d];
+    return '<div class="score-row"><span>' + d.replace(/_/g, ' ') + '</span><strong>' + (val == null ? '-' : val) + '</strong></div>';
+  }).join('');
+
+  detailEl.innerHTML =
+    '<h2>' + esc(it.title) + '</h2>' +
+    '<div><span class="badge ' + esc(ts.category || '') + '">' + esc(ts.category || '-') + '</span>' +
+    '<span class="badge score">total ' + esc(ts.total_score) + '</span></div>' +
+    (draft.needs_revision_note ? '<p style="color:var(--amber);margin-top:10px;">⚠ ' + esc(draft.needs_revision_note) + '</p>' : '') +
+    '<p style="color:var(--muted);">Status: ' + esc(it.status) + '</p>' +
+
+    '<div class="section-label">Rencana Konten (S4 Planning)</div>' +
+    '<p style="color:var(--muted);margin-bottom:8px;"><em>Angle:</em> ' + esc(it.angle || '-') + '</p>' +
+    (it.outline || []).map(o => '<div class="outline-item"><span class="num">' + esc(o.slide_number) + '</span><span>' + esc(o.purpose) + '</span></div>').join('') +
+
+    '<div class="section-label">Hooks</div>' +
+    '<div class="caption-box">' + hooks.map(esc).join('<br>') + '</div>' +
+
+    '<div class="section-label">Slides</div>' +
+    slides.map(s => {
+      const vb = (draft.visual_brief || []).find(b => b.slide_number === s.slide_number);
+      const vbLine = vb ? '<div style="color:var(--muted);font-size:12px;margin-top:6px;">layout: ' + esc(vb.layout) + ' &middot; image: ' + esc(vb.image_cue) + ' &middot; <span style="color:' + esc(vb.accent_color) + '">' + esc(vb.accent_color) + '</span></div>' : '';
+      return '<div class="slide-card"><div class="num">Slide ' + esc(s.slide_number) + '</div>' + esc(s.text) + vbLine + '</div>';
+    }).join('') +
+
+    '<div class="section-label">Caption &amp; CTA</div>' +
+    '<div class="caption-box">' + esc(draft.caption) + '\n\n' + esc(draft.cta) + '</div>' +
+
+    '<div class="section-label">Source Note</div>' +
+    '<div class="caption-box">' + esc(draft.source_note) + '</div>' +
+    (it.raw_sources && it.raw_sources.url ? '<p><a class="source-link" href="' + esc(it.raw_sources.url) + '" target="_blank">Sumber asli →</a></p>' : '') +
+
+    '<div class="section-label">Breakdown Skor (alasan: ' + esc(ts.reason || '-') + ')</div>' +
+    '<div class="scores">' + scoreRows + '</div>' +
+
+    '<div class="section-label">Riwayat Tahap (S1&ndash;S11)</div>' +
+    '<div id="stage-history-' + it.id + '">' +
+      '<div style="color:var(--muted);font-size:12px;">Memuat riwayat...</div>' +
+    '</div>' +
+
+    '<textarea id="revise-note-' + it.id + '" class="revise-note" placeholder="Catatan revisi (wajib diisi)" rows="3"></textarea>' +
+
+    '<div class="actions">' +
+      '<button class="btn-approve" onclick="doAction(\'' + it.id + '\',\'approve\')">Approve</button>' +
+      '<button class="btn-revise" onclick="toggleReviseNote(\'' + it.id + '\')">Revise</button>' +
+      '<button class="btn-reject" onclick="doAction(\'' + it.id + '\',\'reject\')">Reject</button>' +
+      '<button class="btn-archive" onclick="doAction(\'' + it.id + '\',\'archive\')">Archive</button>' +
+      '<button class="btn-download" onclick="doDownload(\'' + it.id + '\')">Download</button>' +
+    '</div>';
+
+  loadStageHistory(it.id);
+}
+
+function toggleReviseNote(id) {
+  const box = document.getElementById('revise-note-' + id);
+  if (box.style.display === 'block') {
+    const note = box.value.trim();
+    if (!note) { alert('Catatan revisi wajib diisi.'); return; }
+    doAction(id, 'revise', note);
+  } else {
+    box.style.display = 'block';
+  }
+}
+
+const STATUS_MAP = { approve: 'approved', revise: 'revise', reject: 'rejected', archive: 'archived' };
+
+async function doAction(contentItemId, action, note) {
+  const { error: e1 } = await sb.schema('s7').from('review_actions').insert({ content_item_id: contentItemId, action, note: note || null });
+  if (e1) { alert('Gagal mencatat aksi: ' + e1.message); return; }
+
+  if (STATUS_MAP[action]) {
+    const { error: e2 } = await sb.schema('s4').from('content_items').update({ status: STATUS_MAP[action] }).eq('id', contentItemId);
+    if (e2) { alert('Gagal update status: ' + e2.message); return; }
+    await sb.from('content_stage_history').insert({
+      content_item_id: contentItemId, stage: 'S7', from_status: 'ready_for_review', to_status: STATUS_MAP[action], note: note || null
+    });
+  }
+  activeId = null;
+  document.getElementById('detail').innerHTML = '<div id="empty">Aksi tersimpan. Pilih konten lain.</div>';
+  loadInbox();
+}
+
+async function loadStageHistory(contentItemId) {
+  const el = document.getElementById('stage-history-' + contentItemId);
+  if (!el) return;
+  const { data, error } = await sb.from('content_stage_history').select('*').eq('content_item_id', contentItemId).order('occurred_at', { ascending: true });
+  if (error) { el.innerHTML = '<div style="color:var(--red);font-size:12px;">Gagal memuat riwayat: ' + esc(error.message) + '</div>'; return; }
+  if (!data || data.length === 0) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Belum ada riwayat tercatat.</div>'; return; }
+  el.innerHTML = data.map(h =>
+    '<div class="outline-item"><span class="num">' + esc(h.stage) + '</span><span>' +
+    esc(h.from_status || '(baru)') + ' &rarr; ' + esc(h.to_status) +
+    ' <span style="color:var(--muted);">(' + esc(new Date(h.occurred_at).toLocaleString('id-ID')) + ')</span>' +
+    (h.note ? ' &mdash; ' + esc(h.note) : '') +
+    '</span></div>'
+  ).join('');
+}
+
+async function doDownload(contentItemId) {
+  const it = items.find(x => x.id === contentItemId);
+  const draft = it && it.carousel_drafts && it.carousel_drafts[0];
+  if (draft && draft.copy_url) window.open(draft.copy_url, '_blank');
+  if (draft && draft.caption_url) window.open(draft.caption_url, '_blank');
+  await sb.schema('s7').from('review_actions').insert({ content_item_id: contentItemId, action: 'download' });
+}
+
+switchTab('inbox');
+</script>
+</body>
+</html>

@@ -10,23 +10,23 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #0b0d12; --bg-elev: #12151c; --panel: #171b24; --panel-2: #1d2230; --border: #262c3a; --border-soft: #1e222d;
-    --text: #eef0f4; --muted: #8b93a7; --muted-2: #5f6779;
-    --accent: #6d8bff; --accent-soft: rgba(109,139,255,0.14); --accent-strong: #4f6ee0;
+    --bg: #0a0a0b; --bg-elev: #101012; --panel: #17171a; --panel-2: #1e1e22; --border: #2a2a2f; --border-soft: #202024;
+    --text: #f2f2f4; --muted: #9a9aa2; --muted-2: #66666e;
+    --accent: #f4f4f7; --accent-soft: rgba(244,244,247,0.10); --accent-strong: #ffffff;
     --green: #35c98f; --green-soft: rgba(53,201,143,0.14);
     --amber: #f4b955; --amber-soft: rgba(244,185,85,0.14);
     --red: #f16d75; --red-soft: rgba(241,109,117,0.14);
     --gray: #6c7688; --gray-soft: rgba(108,118,136,0.14);
     --radius: 10px; --radius-sm: 7px;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.25);
-    --shadow-md: 0 10px 30px rgba(0,0,0,0.35);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md: 0 10px 30px rgba(0,0,0,0.45);
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
     margin:0; font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
-    background: radial-gradient(1200px 600px at 100% -10%, rgba(109,139,255,0.07), transparent),
-                radial-gradient(900px 500px at -10% 110%, rgba(154,123,255,0.05), transparent),
+    background: radial-gradient(1200px 600px at 100% -10%, rgba(255,255,255,0.04), transparent),
+                radial-gradient(900px 500px at -10% 110%, rgba(255,255,255,0.03), transparent),
                 var(--bg);
     color: var(--text); -webkit-font-smoothing: antialiased;
   }
@@ -39,17 +39,17 @@
   header {
     padding: 14px 26px; border-bottom: 1px solid var(--border);
     display:flex; align-items:center; justify-content:space-between; gap: 20px;
-    background: rgba(18,21,28,0.85); backdrop-filter: blur(10px);
+    background: rgba(16,16,18,0.85); backdrop-filter: blur(10px);
     position: sticky; top: 0; z-index: 10;
   }
-  .brand { display:flex; align-items:center; gap: 10px; }
+  .brand { display:flex; align-items:center; gap: 12px; }
   .brand .mark {
-    width: 30px; height: 30px; border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent), #9a7bff);
+    width: 34px; height: 34px; border-radius: 9px;
+    background: #000; border: 1px solid var(--border);
     display:flex; align-items:center; justify-content:center;
-    font-size: 14px; font-weight: 800; color: #0b0d12; letter-spacing: -0.5px;
-    box-shadow: 0 2px 10px rgba(109,139,255,0.35);
+    box-shadow: var(--shadow-sm);
   }
+  .brand .mark svg { width: 22px; height: 22px; }
   header h1 { font-size: 16px; margin:0; font-weight: 700; letter-spacing: -0.01em; }
   header .subtitle { font-size: 11px; color: var(--muted-2); margin-top: 1px; }
   .header-right { display:flex; align-items:center; gap: 14px; }
@@ -59,7 +59,7 @@
     cursor:pointer; font-size:13px; font-weight: 600; font-family: inherit; transition: all .15s ease;
   }
   .tab-btn:hover { color: var(--text); }
-  .tab-btn.active { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+  .tab-btn.active { background: var(--accent); color: var(--bg); box-shadow: var(--shadow-sm); }
   .icon-btn {
     background: var(--panel); border: 1px solid var(--border); color: var(--muted); width: 34px; height: 34px;
     border-radius: 8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition: all .15s ease;
@@ -132,7 +132,7 @@
   }
   .slide-card:hover { border-color: var(--accent); transform: translateX(2px); }
   .slide-card .num {
-    color: var(--accent); font-size: 11px; margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text); font-size: 11px; margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
   }
   .slide-card .body { font-size: 14px; line-height: 1.55; }
 
@@ -145,7 +145,7 @@
   .score-row .score-head { display:flex; justify-content:space-between; margin-bottom: 6px; text-transform: capitalize; color: var(--muted); }
   .score-row .score-head strong { color: var(--text); font-size: 13px; }
   .score-bar-track { height: 5px; border-radius: 999px; background: var(--border); overflow: hidden; }
-  .score-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), #9a7bff); transition: width .4s ease; }
+  .score-bar-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width .4s ease; }
 
   .section-label {
     color: var(--muted-2); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 700;
@@ -172,7 +172,7 @@
   .btn-revise { background: var(--amber); color: #3a2600; }
   .btn-reject { background: var(--red); color: #3a0a0a; }
   .btn-archive { background: var(--panel-2); color: var(--text); border-color: var(--border); }
-  .btn-download { background: var(--accent); color: #fff; }
+  .btn-download { background: var(--accent); color: var(--bg); }
 
   #empty, #config-warning {
     padding: 60px 30px; color: var(--muted); text-align:center; font-size: 13.5px;
@@ -186,8 +186,8 @@
     padding:16px 18px; font-size: 13.5px; line-height: 1.6; color: var(--text);
   }
   .revise-note { display:none; margin-top: 12px; }
-  a.source-link { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; display:inline-flex; align-items:center; gap:5px; }
-  a.source-link:hover { text-decoration: underline; }
+  a.source-link { color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600; display:inline-flex; align-items:center; gap:5px; border-bottom: 1px solid var(--border); padding-bottom:1px; }
+  a.source-link:hover { border-color: var(--accent); }
 
   .outline-item { display:flex; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-soft); font-size:13px; align-items:baseline; }
   .outline-item:last-child { border-bottom: none; }
@@ -237,7 +237,16 @@
 
 <header>
   <div class="brand">
-    <div class="mark">A</div>
+    <div class="mark">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 55 A34 34 0 1 1 82 30" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+        <line x1="80" y1="26" x2="90" y2="15" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+        <circle cx="92" cy="12" r="4.5" fill="white" opacity="0.85"/>
+        <path d="M50 18 L80 85" stroke="white" stroke-width="9" stroke-linecap="round"/>
+        <path d="M50 18 L20 85" stroke="white" stroke-width="9" stroke-linecap="round"/>
+        <circle cx="50" cy="60" r="6" fill="white"/>
+      </svg>
+    </div>
     <div>
       <h1>AIMS Review Hub</h1>
       <div class="subtitle">S7 &middot; Content Review &amp; Approval</div>

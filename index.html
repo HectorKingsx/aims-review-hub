@@ -244,6 +244,19 @@
   .run-row .rr-meta { color: var(--muted); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .run-row .rr-err { color: var(--red); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+  .funnel-row { cursor: pointer; }
+  .funnel-row:hover .fr-label { color: var(--text); }
+  .funnel-drill {
+    display:none; margin: -4px 0 12px 0; padding: 10px 14px; background: var(--panel); border:1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 12.5px; animation: fadeIn .2s ease;
+  }
+  .funnel-drill.open { display:block; }
+  .drill-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding: 6px 0; border-bottom:1px solid var(--border-soft); }
+  .drill-item:last-child { border-bottom:none; }
+  .drill-item .di-title { color: var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .drill-item .di-link { color: var(--muted); flex-shrink:0; text-decoration:none; }
+  .drill-item .di-link:hover { color: var(--accent); }
+
   /* ---------- Toasts ---------- */
   #toast-container { position: fixed; bottom: 22px; right: 22px; display:flex; flex-direction:column; gap: 10px; z-index: 100; }
   .toast {
@@ -437,11 +450,13 @@ async function loadPipeline() {
   funnelRawEl.innerHTML = RAW_STATUS_ORDER.filter(s => rawByStatus[s] != null).map(status => {
     const n = rawByStatus[status] || 0;
     const pct = Math.round((n / rawMax) * 100);
-    return '<div class="funnel-row">' +
+    const drillId = 'drill-raw-' + status;
+    return '<div class="funnel-row" onclick="toggleDrill(\'' + drillId + '\', \'raw\', \'' + status + '\')">' +
       '<div class="fr-label">' + esc(status.replace(/_/g, ' ')) + '</div>' +
       '<div class="fr-track"><div class="fr-fill" style="width:' + pct + '%;"></div></div>' +
       '<div class="fr-count">' + n + '</div>' +
-      '</div>';
+      '</div>' +
+      '<div class="funnel-drill" id="' + drillId + '"><div class="loading-row"><span class="spinner"></span> Memuat...</div></div>';
   }).join('');
 
   // ---- Funnel: content_items grouped by mapped stage ----
@@ -458,12 +473,49 @@ async function loadPipeline() {
     const n = stageTotals[stage];
     const pct = Math.round((n / stageMax) * 100);
     const detail = (stageDetail[stage] || []).join(', ');
-    return '<div class="funnel-row" title="' + esc(detail) + '">' +
+    const statusesForStage = contentCounts.filter(c => c.stage === stage).map(c => c.status);
+    const drillId = 'drill-content-' + stage;
+    return '<div class="funnel-row" title="' + esc(detail) + '" onclick="toggleDrill(\'' + drillId + '\', \'content\', \'' + statusesForStage.join('|') + '\')">' +
       '<div class="fr-label">' + esc(stage) + '</div>' +
       '<div class="fr-track"><div class="fr-fill" style="width:' + pct + '%;"></div></div>' +
       '<div class="fr-count">' + n + '</div>' +
-      '</div>';
-  }).join('') + '<p style="color:var(--muted-2);font-size:11px;margin-top:4px;">Arahkan kursor ke tiap baris untuk rincian status.</p>';
+      '</div>' +
+      '<div class="funnel-drill" id="' + drillId + '"><div class="loading-row"><span class="spinner"></span> Memuat...</div></div>';
+  }).join('') + '<p style="color:var(--muted-2);font-size:11px;margin-top:4px;">Klik baris untuk lihat daftar judul.</p>';
+
+window.toggleDrill = async function(drillId, kind, key) {
+  const el = document.getElementById(drillId);
+  if (!el) return;
+  const isOpen = el.classList.contains('open');
+  if (isOpen) { el.classList.remove('open'); return; }
+  el.classList.add('open');
+  if (el.dataset.loaded === '1') return;
+  el.innerHTML = '<div class="loading-row"><span class="spinner"></span> Memuat...</div>';
+
+  let rows = [];
+  let err = null;
+  if (kind === 'raw') {
+    const res = await sb.from('pipeline_raw_items').select('*').eq('status', key).order('created_at', { ascending: false }).limit(20);
+    rows = res.data || [];
+    err = res.error;
+  } else {
+    const statuses = key.split('|').filter(Boolean);
+    const res = await sb.from('pipeline_content_items').select('*').in('status', statuses).order('created_at', { ascending: false }).limit(20);
+    rows = res.data || [];
+    err = res.error;
+  }
+
+  if (err) { el.innerHTML = '<div style="color:var(--red);">Gagal memuat: ' + esc(err.message) + '</div>'; return; }
+  if (rows.length === 0) { el.innerHTML = '<div style="color:var(--muted);">Tidak ada item.</div>'; el.dataset.loaded = '1'; return; }
+
+  el.innerHTML = rows.map(r =>
+    '<div class="drill-item">' +
+      '<span class="di-title">' + esc(r.title || '(tanpa judul)') + (kind === 'content' ? ' &middot; <span style="color:var(--muted);">' + esc(r.status) + '</span>' : '') + '</span>' +
+      (r.url ? '<a class="di-link" href="' + esc(r.url) + '" target="_blank" onclick="event.stopPropagation()">&rarr;</a>' : '') +
+    '</div>'
+  ).join('');
+  el.dataset.loaded = '1';
+};
 
   // ---- Recent runs list ----
   if (!runs || runs.length === 0) {

@@ -451,7 +451,7 @@ async function loadPipeline() {
     const n = rawByStatus[status] || 0;
     const pct = Math.round((n / rawMax) * 100);
     const drillId = 'drill-raw-' + status;
-    return '<div class="funnel-row" onclick="toggleDrill(\'' + drillId + '\', \'raw\', \'' + status + '\')">' +
+    return '<div class="funnel-row" onclick="toggleDrill(\'' + drillId + '\', \'raw\', \'' + status + '\', ' + n + ')">' +
       '<div class="fr-label">' + esc(status.replace(/_/g, ' ')) + '</div>' +
       '<div class="fr-track"><div class="fr-fill" style="width:' + pct + '%;"></div></div>' +
       '<div class="fr-count">' + n + '</div>' +
@@ -475,7 +475,7 @@ async function loadPipeline() {
     const detail = (stageDetail[stage] || []).join(', ');
     const statusesForStage = contentCounts.filter(c => c.stage === stage).map(c => c.status);
     const drillId = 'drill-content-' + stage;
-    return '<div class="funnel-row" title="' + esc(detail) + '" onclick="toggleDrill(\'' + drillId + '\', \'content\', \'' + statusesForStage.join('|') + '\')">' +
+    return '<div class="funnel-row" title="' + esc(detail) + '" onclick="toggleDrill(\'' + drillId + '\', \'content\', \'' + statusesForStage.join('|') + '\', ' + n + ')">' +
       '<div class="fr-label">' + esc(stage) + '</div>' +
       '<div class="fr-track"><div class="fr-fill" style="width:' + pct + '%;"></div></div>' +
       '<div class="fr-count">' + n + '</div>' +
@@ -483,7 +483,7 @@ async function loadPipeline() {
       '<div class="funnel-drill" id="' + drillId + '"><div class="loading-row"><span class="spinner"></span> Memuat...</div></div>';
   }).join('') + '<p style="color:var(--muted-2);font-size:11px;margin-top:4px;">Klik baris untuk lihat daftar judul.</p>';
 
-window.toggleDrill = async function(drillId, kind, key) {
+window.toggleDrill = async function(drillId, kind, key, totalCount) {
   const el = document.getElementById(drillId);
   if (!el) return;
   const isOpen = el.classList.contains('open');
@@ -508,7 +508,11 @@ window.toggleDrill = async function(drillId, kind, key) {
   if (err) { el.innerHTML = '<div style="color:var(--red);">Gagal memuat: ' + esc(err.message) + '</div>'; return; }
   if (rows.length === 0) { el.innerHTML = '<div style="color:var(--muted);">Tidak ada item.</div>'; el.dataset.loaded = '1'; return; }
 
-  el.innerHTML = rows.map(r =>
+  const headerNote = (totalCount != null && totalCount > rows.length)
+    ? '<div style="color:var(--muted-2);font-size:11px;margin-bottom:8px;">Menampilkan ' + rows.length + ' dari ' + totalCount + ' (terbaru)</div>'
+    : '';
+
+  el.innerHTML = headerNote + rows.map(r =>
     '<div class="drill-item">' +
       '<span class="di-title">' + esc(r.title || '(tanpa judul)') + (kind === 'content' ? ' &middot; <span style="color:var(--muted);">' + esc(r.status) + '</span>' : '') + '</span>' +
       (r.url ? '<a class="di-link" href="' + esc(r.url) + '" target="_blank" onclick="event.stopPropagation()">&rarr;</a>' : '') +

@@ -152,6 +152,7 @@
     margin: 28px 0 10px; display:flex; align-items:center; gap: 8px;
   }
   .section-label::after { content:''; flex:1; height:1px; background: var(--border-soft); }
+  .section-label:first-child { margin-top: 0; }
 
   textarea, input[type=text] {
     width: 100%; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm);
@@ -215,6 +216,34 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ---------- Pipeline monitor ---------- */
+  .health-strip { display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 8px; }
+  .health-pill {
+    display:flex; align-items:center; gap:8px; background: var(--panel); border:1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 14px; min-width: 120px; transition: border-color .15s ease;
+    animation: fadeInUp .2s ease both;
+  }
+  .health-pill:hover { border-color: var(--accent); }
+  .health-pill .hp-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .health-pill .hp-step { font-weight:800; font-size:13px; }
+  .health-pill .hp-time { font-size:11px; color: var(--muted); margin-top:2px; }
+  .funnel-group { margin-bottom: 22px; }
+  .funnel-row { display:flex; align-items:center; gap: 12px; margin-bottom: 8px; }
+  .funnel-row .fr-label { width: 150px; flex-shrink:0; font-size: 12.5px; color: var(--muted); text-transform: capitalize; display:flex; align-items:center; gap:6px; }
+  .funnel-row .fr-track { flex:1; height: 20px; background: var(--panel); border-radius: 6px; overflow:hidden; position:relative; border:1px solid var(--border); }
+  .funnel-row .fr-fill { height: 100%; background: var(--accent); transition: width .5s ease; }
+  .funnel-row .fr-count { width: 40px; text-align:right; font-size: 12.5px; font-weight: 700; flex-shrink:0; }
+  .run-row {
+    display:flex; align-items:center; gap: 14px; padding: 10px 14px; border-radius: var(--radius-sm); border:1px solid var(--border);
+    background: var(--panel); margin-bottom: 6px; font-size: 12.5px; animation: fadeInUp .2s ease both;
+  }
+  .run-row .rr-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .run-row .rr-step { font-weight:800; width: 34px; flex-shrink:0; }
+  .run-row .rr-time { color: var(--muted); width: 130px; flex-shrink:0; }
+  .run-row .rr-dur { color: var(--muted); width: 60px; flex-shrink:0; }
+  .run-row .rr-meta { color: var(--muted); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .run-row .rr-err { color: var(--red); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
   /* ---------- Toasts ---------- */
   #toast-container { position: fixed; bottom: 22px; right: 22px; display:flex; flex-direction:column; gap: 10px; z-index: 100; }
   .toast {
@@ -249,12 +278,13 @@
     </div>
     <div>
       <h1>AIMS Review Hub</h1>
-      <div class="subtitle">S7 &middot; Content Review &amp; Approval</div>
+      <div class="subtitle">S1&ndash;S8 &middot; Pipeline &amp; Review</div>
     </div>
   </div>
   <div class="header-right">
     <div class="tabs">
       <button class="tab-btn active" id="tab-inbox" onclick="switchTab('inbox')">Inbox</button>
+      <button class="tab-btn" id="tab-pipeline" onclick="switchTab('pipeline')">Pipeline</button>
       <button class="tab-btn" id="tab-insights" onclick="switchTab('insights')">Insights</button>
     </div>
     <button class="icon-btn" title="Reload" onclick="switchTab(currentTab)">
@@ -295,6 +325,16 @@
     </div>
   </div>
 </div>
+<div id="pipeline-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);">
+  <div class="section-label">Status Terakhir per Tahap</div>
+  <div class="health-strip" id="health-strip"></div>
+  <div class="section-label">Funnel Sumber Berita (S1&ndash;S3)</div>
+  <div class="funnel-group" id="funnel-raw"></div>
+  <div class="section-label">Funnel Konten (S4&ndash;S10)</div>
+  <div class="funnel-group" id="funnel-content"></div>
+  <div class="section-label">Riwayat Run Terbaru</div>
+  <div id="runs-list"></div>
+</div>
 <div id="insights-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);"></div>
 <div id="toast-container"></div>
 
@@ -326,10 +366,122 @@ function showToast(msg, type) {
 function switchTab(tab) {
   currentTab = tab;
   document.getElementById('tab-inbox').classList.toggle('active', tab === 'inbox');
+  document.getElementById('tab-pipeline').classList.toggle('active', tab === 'pipeline');
   document.getElementById('tab-insights').classList.toggle('active', tab === 'insights');
   document.getElementById('layout').style.display = tab === 'inbox' ? 'flex' : 'none';
+  document.getElementById('pipeline-view').style.display = tab === 'pipeline' ? 'block' : 'none';
   document.getElementById('insights-view').style.display = tab === 'insights' ? 'block' : 'none';
-  if (tab === 'inbox') loadInbox(); else loadInsights();
+  if (tab === 'inbox') loadInbox();
+  else if (tab === 'pipeline') loadPipeline();
+  else loadInsights();
+}
+
+function relativeTime(iso) {
+  if (!iso) return '-';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'baru saja';
+  if (mins < 60) return mins + ' menit lalu';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + ' jam lalu';
+  const days = Math.floor(hrs / 24);
+  return days + ' hari lalu';
+}
+
+const PIPELINE_STEPS = ['S1','S2','S3','S4','S5','S6','S8','S9','S10','S11'];
+const RAW_STATUS_ORDER = ['collected','filtered','scored','drafted','needs_review','dropped','duplicate','failed'];
+const CONTENT_STAGE_ORDER = ['S4','S5','S6','S7','S8','S9','S10'];
+
+async function loadPipeline() {
+  const healthEl = document.getElementById('health-strip');
+  const funnelRawEl = document.getElementById('funnel-raw');
+  const funnelContentEl = document.getElementById('funnel-content');
+  const runsEl = document.getElementById('runs-list');
+  healthEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Memuat...</div>';
+  funnelRawEl.innerHTML = '';
+  funnelContentEl.innerHTML = '';
+  runsEl.innerHTML = '';
+
+  const [{ data: counts, error: countsErr }, { data: runs, error: runsErr }] = await Promise.all([
+    sb.from('pipeline_stage_counts').select('*'),
+    sb.from('pipeline_job_runs_summary').select('*').order('started_at', { ascending: false }).limit(200)
+  ]);
+
+  if (countsErr || runsErr) {
+    healthEl.innerHTML = '<div style="color:var(--red);">Gagal memuat data pipeline: ' + esc((countsErr || runsErr).message) + '</div>';
+    return;
+  }
+
+  // ---- Health strip: latest run per step ----
+  const latestByStep = {};
+  (runs || []).forEach(r => {
+    if (!latestByStep[r.step] || new Date(r.started_at) > new Date(latestByStep[r.step].started_at)) {
+      latestByStep[r.step] = r;
+    }
+  });
+  const statusColor = { success: 'var(--green)', partial: 'var(--amber)', failed: 'var(--red)' };
+  healthEl.innerHTML = PIPELINE_STEPS.map((step, i) => {
+    const run = latestByStep[step];
+    const color = run ? (statusColor[run.status] || 'var(--gray)') : 'var(--gray)';
+    const label = run ? relativeTime(run.started_at) : 'belum ada data';
+    return '<div class="health-pill" style="animation-delay:' + (i * 0.03) + 's;">' +
+      '<span class="hp-dot" style="background:' + color + ';"></span>' +
+      '<div><div class="hp-step">' + esc(step) + '</div><div class="hp-time">' + esc(label) + '</div></div>' +
+      '</div>';
+  }).join('');
+
+  // ---- Funnel: S1 raw_sources.status ----
+  const rawCounts = (counts || []).filter(c => c.stage === 'S1');
+  const rawByStatus = Object.fromEntries(rawCounts.map(c => [c.status, c.item_count]));
+  const rawMax = Math.max(1, ...rawCounts.map(c => c.item_count));
+  funnelRawEl.innerHTML = RAW_STATUS_ORDER.filter(s => rawByStatus[s] != null).map(status => {
+    const n = rawByStatus[status] || 0;
+    const pct = Math.round((n / rawMax) * 100);
+    return '<div class="funnel-row">' +
+      '<div class="fr-label">' + esc(status.replace(/_/g, ' ')) + '</div>' +
+      '<div class="fr-track"><div class="fr-fill" style="width:' + pct + '%;"></div></div>' +
+      '<div class="fr-count">' + n + '</div>' +
+      '</div>';
+  }).join('');
+
+  // ---- Funnel: content_items grouped by mapped stage ----
+  const contentCounts = (counts || []).filter(c => c.stage !== 'S1');
+  const stageTotals = {};
+  const stageDetail = {};
+  contentCounts.forEach(c => {
+    stageTotals[c.stage] = (stageTotals[c.stage] || 0) + c.item_count;
+    stageDetail[c.stage] = stageDetail[c.stage] || [];
+    stageDetail[c.stage].push(c.status + ': ' + c.item_count);
+  });
+  const stageMax = Math.max(1, ...Object.values(stageTotals));
+  funnelContentEl.innerHTML = CONTENT_STAGE_ORDER.filter(s => stageTotals[s] != null).map(stage => {
+    const n = stageTotals[stage];
+    const pct = Math.round((n / stageMax) * 100);
+    const detail = (stageDetail[stage] || []).join(', ');
+    return '<div class="funnel-row" title="' + esc(detail) + '">' +
+      '<div class="fr-label">' + esc(stage) + '</div>' +
+      '<div class="fr-track"><div class="fr-fill" style="width:' + pct + '%;"></div></div>' +
+      '<div class="fr-count">' + n + '</div>' +
+      '</div>';
+  }).join('') + '<p style="color:var(--muted-2);font-size:11px;margin-top:4px;">Arahkan kursor ke tiap baris untuk rincian status.</p>';
+
+  // ---- Recent runs list ----
+  if (!runs || runs.length === 0) {
+    runsEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">Belum ada job_runs tercatat.</div>';
+    return;
+  }
+  runsEl.innerHTML = runs.slice(0, 40).map((r, i) => {
+    const color = statusColor[r.status] || 'var(--gray)';
+    const meta = 'collected:' + (r.sources_collected ?? 0) + ' skip304:' + (r.sources_skipped_304 ?? 0) +
+      ' generated:' + (r.content_generated ?? 0) + ' tokens:' + (r.tokens_used ?? 0) + ' cost:$' + (r.cost_estimate ?? 0);
+    return '<div class="run-row" style="animation-delay:' + (i * 0.015) + 's;">' +
+      '<span class="rr-dot" style="background:' + color + ';"></span>' +
+      '<span class="rr-step">' + esc(r.step) + '</span>' +
+      '<span class="rr-time">' + esc(new Date(r.started_at).toLocaleString('id-ID')) + '</span>' +
+      '<span class="rr-dur">' + (r.duration_seconds != null ? r.duration_seconds + 's' : '-') + '</span>' +
+      (r.error_excerpt ? '<span class="rr-err" title="' + esc(r.error_excerpt) + '">' + esc(r.error_excerpt) + '</span>' : '<span class="rr-meta" title="' + esc(meta) + '">' + esc(meta) + '</span>') +
+      '</div>';
+  }).join('');
 }
 
 async function loadInsights() {

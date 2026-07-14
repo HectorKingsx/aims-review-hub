@@ -273,6 +273,24 @@
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
   ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ---------- Produced grid (Siap Publish) ---------- */
+  .produced-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .produced-toolbar .search-box { max-width: 320px; }
+  .produced-count { color: var(--muted-2); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+  .produced-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap:16px; }
+  .produced-card { background: var(--panel); border:1px solid var(--border); border-radius: var(--radius); overflow:hidden; cursor:pointer; transition: all .15s ease; animation: fadeInUp .25s ease both; }
+  .produced-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .produced-card .thumb { width:100%; aspect-ratio: 1 / 1; object-fit: cover; display:block; background: var(--panel-2); }
+  .produced-card .pc-body { padding: 10px 12px; }
+  .produced-card .pc-title { font-size:12.5px; font-weight:600; line-height:1.4; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height: 34px; }
+  .produced-card .pc-meta { font-size:11px; color: var(--muted-2); display:flex; justify-content:space-between; }
+
+  .lightbox-overlay { position:fixed; inset:0; background: rgba(0,0,0,0.82); z-index:200; display:flex; align-items:center; justify-content:center; padding: 30px; animation: fadeIn .2s ease; }
+  .lightbox-box { background: var(--bg-elev); border:1px solid var(--border); border-radius: var(--radius); max-width: 1020px; width:100%; max-height: 88vh; overflow-y:auto; padding: 26px 30px; animation: popIn .2s ease; position:relative; }
+  .lightbox-close { position:absolute; top:18px; right:18px; }
+  .lightbox-slides { display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; margin: 16px 0; }
+  .lightbox-slides img { height: 280px; border-radius: var(--radius-sm); border:1px solid var(--border); flex-shrink:0; }
 </style>
 </head>
 <body>
@@ -297,6 +315,7 @@
   <div class="header-right">
     <div class="tabs">
       <button class="tab-btn active" id="tab-inbox" onclick="switchTab('inbox')">Inbox</button>
+      <button class="tab-btn" id="tab-produced" onclick="switchTab('produced')">Siap Publish</button>
       <button class="tab-btn" id="tab-pipeline" onclick="switchTab('pipeline')">Pipeline</button>
       <button class="tab-btn" id="tab-insights" onclick="switchTab('insights')">Insights</button>
     </div>
@@ -349,6 +368,16 @@
   <div id="runs-list"></div>
 </div>
 <div id="insights-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);"></div>
+<div id="produced-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);">
+  <div class="produced-toolbar">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <input type="text" id="produced-search" placeholder="Cari judul konten..." oninput="renderProducedGrid()">
+    </div>
+    <div class="produced-count" id="produced-count"></div>
+  </div>
+  <div class="produced-grid" id="produced-grid"></div>
+</div>
 <div id="toast-container"></div>
 
 <script>
@@ -361,6 +390,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let items = [];
 let activeId = null;
 let currentTab = 'inbox';
+let producedItems = [];
 
 function showToast(msg, type) {
   type = type || 'info';
@@ -379,14 +409,89 @@ function showToast(msg, type) {
 function switchTab(tab) {
   currentTab = tab;
   document.getElementById('tab-inbox').classList.toggle('active', tab === 'inbox');
+  document.getElementById('tab-produced').classList.toggle('active', tab === 'produced');
   document.getElementById('tab-pipeline').classList.toggle('active', tab === 'pipeline');
   document.getElementById('tab-insights').classList.toggle('active', tab === 'insights');
   document.getElementById('layout').style.display = tab === 'inbox' ? 'flex' : 'none';
+  document.getElementById('produced-view').style.display = tab === 'produced' ? 'block' : 'none';
   document.getElementById('pipeline-view').style.display = tab === 'pipeline' ? 'block' : 'none';
   document.getElementById('insights-view').style.display = tab === 'insights' ? 'block' : 'none';
   if (tab === 'inbox') loadInbox();
+  else if (tab === 'produced') loadProduced();
   else if (tab === 'pipeline') loadPipeline();
   else loadInsights();
+}
+
+async function loadProduced() {
+  const el = document.getElementById('produced-grid');
+  document.getElementById('produced-count').textContent = '';
+  el.innerHTML = '<div class="loading-row"><span class="spinner"></span> Memuat...</div>';
+
+  const { data: ciData, error } = await sb.schema('s4').from('content_items').select('*').eq('status', 'produced').order('updated_at', { ascending: false });
+  if (error) { el.innerHTML = '<div style="color:var(--red);">Gagal memuat: ' + esc(error.message) + '</div>'; return; }
+  if (!ciData || ciData.length === 0) { el.innerHTML = '<div style="color:var(--muted);padding:20px 4px;">Belum ada konten produced.</div>'; return; }
+
+  const ids = ciData.map(i => i.id);
+  const [{ data: prods, error: prodErr }, { data: drafts, error: draftErr }] = await Promise.all([
+    sb.schema('s8').from('content_production').select('*').in('content_item_id', ids).eq('status', 'success'),
+    sb.schema('s5').from('carousel_drafts').select('*').in('content_item_id', ids)
+  ]);
+  if (prodErr || draftErr) { el.innerHTML = '<div style="color:var(--red);">Gagal memuat data produksi: ' + esc((prodErr || draftErr).message) + '</div>'; return; }
+
+  const prodByItem = Object.fromEntries((prods || []).map(p => [p.content_item_id, p]));
+  const draftByItem = Object.fromEntries((drafts || []).map(d => [d.content_item_id, d]));
+
+  producedItems = ciData
+    .filter(it => prodByItem[it.id] && Array.isArray(prodByItem[it.id].image_urls) && prodByItem[it.id].image_urls.length > 0)
+    .map(it => ({ ...it, production: prodByItem[it.id], draft: draftByItem[it.id] || {} }));
+
+  renderProducedGrid();
+}
+
+function renderProducedGrid() {
+  const el = document.getElementById('produced-grid');
+  if (!el) return;
+  const q = (document.getElementById('produced-search').value || '').toLowerCase().trim();
+  const filtered = q ? producedItems.filter(it => (it.title || '').toLowerCase().includes(q)) : producedItems;
+  document.getElementById('produced-count').textContent = filtered.length + ' konten siap publish';
+
+  if (producedItems.length === 0) { el.innerHTML = '<div style="color:var(--muted);padding:20px 4px;">Belum ada konten produced.</div>'; return; }
+  if (filtered.length === 0) { el.innerHTML = '<div style="color:var(--muted);padding:20px 4px;">Tidak ada hasil untuk pencarian ini.</div>'; return; }
+
+  el.innerHTML = filtered.map((it, i) => {
+    const thumb = it.production.image_urls[0];
+    const n = it.production.image_urls.length;
+    return '<div class="produced-card" style="animation-delay:' + (i * 0.02) + 's;" onclick="openLightbox(\'' + it.id + '\')">' +
+      '<img class="thumb" src="' + esc(thumb) + '" loading="lazy" alt="">' +
+      '<div class="pc-body">' +
+      '<div class="pc-title">' + esc(it.title || '(tanpa judul)') + '</div>' +
+      '<div class="pc-meta"><span>' + n + ' slide</span><span>' + relativeTime(it.updated_at) + '</span></div>' +
+      '</div></div>';
+  }).join('');
+}
+
+function openLightbox(id) {
+  const it = producedItems.find(x => x.id === id);
+  if (!it) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'lightbox-overlay';
+  overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+  const slidesHtml = it.production.image_urls.map((url, i) =>
+    '<a href="' + esc(url) + '" target="_blank" title="Buka slide ' + (i + 1) + ' ukuran penuh"><img src="' + esc(url) + '" alt="Slide ' + (i + 1) + '"></a>'
+  ).join('');
+  const captionText = (it.draft.caption || '-') + (it.draft.cta ? '\n\n' + it.draft.cta : '');
+  overlay.innerHTML =
+    '<div class="lightbox-box">' +
+    '<button class="icon-btn lightbox-close" onclick="this.closest(\'.lightbox-overlay\').remove()">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+    '</button>' +
+    '<h2 style="margin:0 0 6px;font-size:18px;padding-right:40px;">' + esc(it.title || '(tanpa judul)') + '</h2>' +
+    '<div style="color:var(--muted);font-size:12px;">' + it.production.image_urls.length + ' slide &middot; diproduksi ' + esc(relativeTime(it.updated_at)) + '</div>' +
+    '<div class="lightbox-slides">' + slidesHtml + '</div>' +
+    '<div class="section-label">Caption &amp; CTA</div>' +
+    '<div class="caption-box">' + esc(captionText) + '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
 }
 
 function relativeTime(iso) {

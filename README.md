@@ -1,1 +1,1 @@
-# aims-review-hub
+# AIMS BOARD

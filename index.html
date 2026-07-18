@@ -305,6 +305,42 @@
   .produced-card .pc-title { font-size:12.5px; font-weight:600; line-height:1.4; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height: 34px; }
   .produced-card .pc-meta { font-size:11px; color: var(--muted-2); display:flex; justify-content:space-between; }
 
+  /* ---------- Item stepper (progress S1-S12) ---------- */
+  .stepper { display:flex; flex-direction:column; }
+  .step-row { display:flex; gap: 14px; position: relative; }
+  .step-row .step-rail { display:flex; flex-direction:column; align-items:center; flex-shrink:0; width: 24px; }
+  .step-row .step-dot {
+    width: 24px; height: 24px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; font-size:11px; font-weight:800; border: 2px solid var(--border); background: var(--panel); color: var(--muted-2);
+    transition: all .15s ease; z-index:1;
+  }
+  .step-row .step-line { width:2px; flex:1; min-height: 18px; background: var(--border); margin: 2px 0; }
+  .step-row:last-child .step-line { display:none; }
+  .step-row .step-body { padding-bottom: 22px; flex:1; min-width:0; }
+  .step-row .step-name { font-size: 13.5px; font-weight: 700; color: var(--muted-2); line-height: 1.4; }
+  .step-row .step-detail { font-size: 12px; color: var(--muted-2); margin-top: 3px; }
+  .step-row .step-note { font-size: 11.5px; color: var(--muted-2); margin-top: 4px; font-style: italic; }
+
+  .step-row.done .step-dot { background: var(--green); border-color: var(--green); color: #04241a; }
+  .step-row.done .step-line { background: var(--green); }
+  .step-row.done .step-name { color: var(--text); }
+  .step-row.done .step-detail { color: var(--muted); }
+
+  .step-row.current .step-dot { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .step-row.current .step-name { color: var(--text); }
+  .step-row.current .step-detail { color: var(--muted); }
+
+  .step-row.warning .step-dot { background: var(--amber); border-color: var(--amber); color: #3a2600; }
+  .step-row.warning .step-name { color: var(--text); }
+  .step-row.warning .step-detail { color: var(--amber); }
+
+  .step-row.blocked .step-dot { background: var(--red); border-color: var(--red); color: #3a0a0a; }
+  .step-row.blocked .step-name { color: var(--text); }
+  .step-row.blocked .step-detail { color: var(--red); }
+
+  .step-row.pending .step-dot { background: var(--panel); border-color: var(--border); color: var(--muted-2); }
+  .step-row.pending .step-name { color: var(--muted-2); }
+
   .lightbox-overlay { position:fixed; inset:0; background: rgba(0,0,0,0.82); z-index:200; display:flex; align-items:center; justify-content:center; padding: 30px; animation: fadeIn .2s ease; }
   .lightbox-box { background: var(--bg-elev); border:1px solid var(--border); border-radius: var(--radius); max-width: 1020px; width:100%; max-height: 88vh; overflow-y:auto; padding: 26px 30px; animation: popIn .2s ease; position:relative; }
   .lightbox-close { position:absolute; top:18px; right:18px; }
@@ -896,6 +932,9 @@ function showDetail(id) {
     (draft.needs_revision_note ? '<div class="warn-note">⚠ ' + esc(draft.needs_revision_note) + '</div>' : '') +
     '<p class="status-line">Status: ' + esc(it.status) + '</p>' +
 
+    '<div class="section-label">Progress Konten (S1&ndash;S12)</div>' +
+    '<div class="stepper" id="stepper-' + it.id + '"><div class="loading-row"><span class="spinner"></span> Memuat progress...</div></div>' +
+
     '<div class="section-label">Critical Gates</div>' +
     '<div class="gates-grid" id="gates-' + it.id + '"><div class="loading-row" style="padding:0;"><span class="spinner"></span> Memuat gates...</div></div>' +
 
@@ -961,7 +1000,93 @@ function showDetail(id) {
     '</div>';
 
   loadStageHistory(it.id);
+  loadStepper(it);
   loadCriticalGates(it.id, it.raw_sources ? it.raw_sources.topic_scores : null);
+}
+
+// ---------- Item progress stepper (S1-S12) ----------
+const ITEM_PIPELINE_STEPS = [
+  { key: 'S1', name: 'S1 · Dikumpulkan', desc: 'Berita masuk dari sumber' },
+  { key: 'S2', name: 'S2 · Difilter', desc: 'Lolos filter awal relevansi' },
+  { key: 'S3', name: 'S3 · Diskor', desc: 'Penilaian topik & kelayakan' },
+  { key: 'S4', name: 'S4 · Direncanakan', desc: 'Outline & angle konten dibuat' },
+  { key: 'S5', name: 'S5 · Draft Ditulis', desc: 'Slide, hook, caption disusun' },
+  { key: 'S6', name: 'S6 · Visual Disiapkan', desc: 'Foto AI & visual brief dibuat' },
+  { key: 'S7', name: 'S7 · Review & Approval', desc: 'Auto-approve skor / keputusan Vincent' },
+  { key: 'S8', name: 'S8 · Diproduksi', desc: 'Render carousel final' },
+  { key: 'S9', name: 'S9 · Dipublikasikan', desc: 'Posting ke platform (belum aktif)' },
+  { key: 'S10', name: 'S10 · Dilacak', desc: 'Metrik performa (belum aktif)' }
+];
+
+async function loadStepper(it) {
+  const el = document.getElementById('stepper-' + it.id);
+  if (!el) return;
+
+  const [{ data: history }, qcRes] = await Promise.all([
+    sb.from('content_stage_history').select('*').eq('content_item_id', it.id).order('occurred_at', { ascending: true }),
+    sb.from('qc_content_validations').select('*').eq('content_item_id', it.id).eq('stage', 'S5').order('checked_at', { ascending: false }).limit(1)
+  ]);
+  const qc = qcRes.data && qcRes.data[0];
+
+  const historyByStage = {};
+  (history || []).forEach(h => {
+    if (!historyByStage[h.stage]) historyByStage[h.stage] = [];
+    historyByStage[h.stage].push(h);
+  });
+
+  // status content_items saat ini menentukan step mana yang "current" / terhenti
+  const status = it.status;
+  const STATUS_TO_STEP_INDEX = {
+    planned: 3, drafted: 4, visual_ready: 5,
+    ready_for_review: 6, approved: 6, revise: 6, rejected: 6, archived: 6,
+    produced: 7, published: 8, tracked: 9
+  };
+  const currentIdx = STATUS_TO_STEP_INDEX[status] != null ? STATUS_TO_STEP_INDEX[status] : 3;
+  const terminalNegative = ['rejected', 'archived'].includes(status);
+  const isRevise = status === 'revise';
+
+  el.innerHTML = ITEM_PIPELINE_STEPS.map((step, i) => {
+    let state = 'pending';
+    let detail = '';
+    let note = '';
+    const hist = historyByStage[step.key];
+    const lastHist = hist ? hist[hist.length - 1] : null;
+
+    if (i < currentIdx) {
+      state = 'done';
+      detail = lastHist ? relativeTime(lastHist.occurred_at) : '';
+    } else if (i === currentIdx) {
+      if (terminalNegative && step.key === 'S7') {
+        state = 'blocked';
+        detail = status === 'rejected' ? 'Ditolak' : 'Diarsipkan';
+      } else if (isRevise && step.key === 'S7') {
+        state = 'warning';
+        detail = 'Menunggu revisi';
+      } else {
+        state = 'current';
+        detail = ['produced', 'published', 'tracked'].includes(status) && step.key !== 'S9' && step.key !== 'S10' ? relativeTime(lastHist ? lastHist.occurred_at : it.updated_at) : 'Sedang berjalan';
+        if (step.key === 'S8' && status === 'produced') { state = 'done'; detail = relativeTime(it.updated_at); }
+      }
+    } else {
+      state = 'pending';
+      detail = (step.key === 'S9' || step.key === 'S10') ? 'Belum aktif (V0.5)' : 'Menunggu';
+    }
+
+    if (step.key === 'S5' && qc && i <= currentIdx) {
+      if (qc.validation_status === 'BLOCKED') note = 'QC: diblokir masalah faktual';
+      else if (qc.validation_status === 'PASS_WITH_WARNING' || qc.validation_status === 'NEEDS_REVISION') note = 'QC: lolos dengan catatan';
+    }
+    if (lastHist && lastHist.note && state !== 'pending') note = note || lastHist.note;
+
+    return '<div class="step-row ' + state + '">' +
+      '<div class="step-rail"><div class="step-dot">' + (state === 'done' ? '✓' : (i + 1)) + '</div><div class="step-line"></div></div>' +
+      '<div class="step-body">' +
+        '<div class="step-name">' + esc(step.name) + '</div>' +
+        '<div class="step-detail">' + esc(step.desc) + (detail ? ' &middot; ' + esc(detail) : '') + '</div>' +
+        (note ? '<div class="step-note">' + esc(note) + '</div>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
 }
 
 function toggleForm(formId) {

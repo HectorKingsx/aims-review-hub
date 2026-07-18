@@ -375,6 +375,36 @@
   .arch-badge.weekly { background: var(--accent-soft); color: var(--accent); }
   .arch-badge.off { background: var(--gray-soft); color: var(--gray); }
 
+  /* ---------- Biaya (cost dashboard) ---------- */
+  .cost-summary-strip { display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
+  .cost-card { flex:1; min-width:160px; background: var(--panel); border:1px solid var(--border); border-radius: var(--radius); padding:16px 18px; animation: fadeInUp .2s ease both; }
+  .cost-card .cc-value { font-size: 24px; font-weight:800; line-height:1.1; }
+  .cost-card .cc-label { font-size: 11px; color: var(--muted-2); text-transform:uppercase; letter-spacing:.05em; margin-top:6px; font-weight:700; }
+  .cost-card .cc-sub { font-size:11.5px; color:var(--muted); margin-top:4px; }
+
+  .cost-table { width:100%; border-collapse: collapse; font-size:13px; }
+  .cost-table th { text-align:left; color:var(--muted-2); font-size:11px; text-transform:uppercase; letter-spacing:.04em; font-weight:700; padding: 8px 12px; border-bottom:1px solid var(--border); }
+  .cost-table td { padding: 10px 12px; border-bottom:1px solid var(--border-soft); }
+  .cost-table tr:last-child td { border-bottom:none; }
+  .cost-table td.num, .cost-table th.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .cost-table .ct-bar-cell { display:flex; align-items:center; gap:10px; }
+  .cost-table .ct-bar-track { flex:1; height:8px; background:var(--panel-2); border-radius:4px; overflow:hidden; min-width:60px; }
+  .cost-table .ct-bar-fill { height:100%; background:var(--accent); }
+  .cost-table .ct-gap { color: var(--amber); font-size:11px; }
+
+  .infra-row { display:flex; align-items:center; gap:12px; padding:10px 12px; border-bottom:1px solid var(--border-soft); font-size:13px; }
+  .infra-row:last-child { border-bottom:none; }
+  .infra-row .ir-name { flex:1; font-weight:600; }
+  .infra-row .ir-cat { color:var(--muted-2); font-size:11px; text-transform:uppercase; width:90px; flex-shrink:0; }
+  .infra-row input[type=number] {
+    width:100px; background: var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px;
+    padding:6px 10px; font-family:inherit; font-size:13px; text-align:right; outline:none;
+  }
+  .infra-row input[type=number]:focus { border-color: var(--accent); }
+  .infra-row .ir-note { color:var(--muted-2); font-size:11.5px; width:220px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .infra-row .ir-save { font-size:11px; color:var(--green); opacity:0; transition:opacity .3s ease; }
+  .infra-row .ir-save.show { opacity:1; }
+
   .lightbox-overlay { position:fixed; inset:0; background: rgba(0,0,0,0.82); z-index:200; display:flex; align-items:center; justify-content:center; padding: 30px; animation: fadeIn .2s ease; }
   .lightbox-box { background: var(--bg-elev); border:1px solid var(--border); border-radius: var(--radius); max-width: 1020px; width:100%; max-height: 88vh; overflow-y:auto; padding: 26px 30px; animation: popIn .2s ease; position:relative; }
   .lightbox-close { position:absolute; top:18px; right:18px; }
@@ -408,6 +438,7 @@
       <button class="tab-btn" id="tab-not-recommended" onclick="switchTab('not_recommended')">Not Recommended</button>
       <button class="tab-btn" id="tab-produced" onclick="switchTab('produced')">Siap Publish</button>
       <button class="tab-btn" id="tab-pipeline" onclick="switchTab('pipeline')">Pipeline</button>
+      <button class="tab-btn" id="tab-cost" onclick="switchTab('cost')">Biaya</button>
       <button class="tab-btn" id="tab-insights" onclick="switchTab('insights')">Insights</button>
     </div>
     <button class="icon-btn" title="Reload" onclick="switchTab(currentTab)">
@@ -462,6 +493,13 @@
   <div class="funnel-group" id="funnel-content"></div>
   <div class="section-label">Riwayat Run Terbaru</div>
   <div id="runs-list"></div>
+</div>
+<div id="cost-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);">
+  <div class="cost-summary-strip" id="cost-summary"></div>
+  <div class="section-label">Biaya API per Stage (Sepanjang Waktu)</div>
+  <table class="cost-table" id="cost-table-el"><tbody><tr><td colspan="4"><div class="loading-row"><span class="spinner"></span> Memuat...</div></td></tr></tbody></table>
+  <div class="section-label">Biaya Infra Tetap (isi manual, per bulan)</div>
+  <div id="infra-list"></div>
 </div>
 <div id="insights-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);"></div>
 <div id="produced-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);">
@@ -519,6 +557,7 @@ function switchTab(tab) {
   document.getElementById('home-view').style.display = tab === 'home' ? 'block' : 'none';
   document.getElementById('produced-view').style.display = tab === 'produced' ? 'block' : 'none';
   document.getElementById('pipeline-view').style.display = tab === 'pipeline' ? 'block' : 'none';
+  document.getElementById('cost-view').style.display = tab === 'cost' ? 'block' : 'none';
   document.getElementById('insights-view').style.display = tab === 'insights' ? 'block' : 'none';
   if (isQueueTab) {
     currentQueueStatus = tab === 'inbox' ? 'ready_for_review' : 'not_recommended';
@@ -529,6 +568,7 @@ function switchTab(tab) {
   else if (tab === 'home') loadHome();
   else if (tab === 'produced') loadProduced();
   else if (tab === 'pipeline') loadPipeline();
+  else if (tab === 'cost') loadCost();
   else loadInsights();
 }
 
@@ -830,6 +870,95 @@ async function loadHome() {
     '</div>';
   }).join('');
 }
+
+// ---------- Biaya (cost dashboard) ----------
+// Stage yang seharusnya punya biaya API tapi field cost_estimate-nya belum/tidak dihitung di kode n8n.
+// Dipertahankan sebagai daftar eksplisit supaya gap tracking baru di masa depan gampang ketahuan
+// (misal kalau S9 nanti aktif dan pakai API berbayar tapi lupa dihitung).
+const KNOWN_COST_GAPS = {}; // kosong sejak fix S6 2026-07-18 - isi lagi kalau ditemukan gap baru
+
+function fmtUsd(n) {
+  const v = Number(n) || 0;
+  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
+async function loadCost() {
+  const summaryEl = document.getElementById('cost-summary');
+  const tableEl = document.getElementById('cost-table-el');
+  const infraEl = document.getElementById('infra-list');
+  summaryEl.innerHTML = '';
+  tableEl.innerHTML = '<tbody><tr><td colspan="4"><div class="loading-row"><span class="spinner"></span> Memuat...</div></td></tr></tbody>';
+  infraEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Memuat...</div>';
+
+  const [{ data: costs, error: costErr }, { data: infra, error: infraErr }] = await Promise.all([
+    sb.from('pipeline_cost_by_step').select('*'),
+    sb.from('infra_costs').select('*').order('category', { ascending: true })
+  ]);
+
+  if (costErr) { tableEl.innerHTML = '<tbody><tr><td colspan="4" style="color:var(--red);">Gagal memuat: ' + esc(costErr.message) + '</td></tr></tbody>'; return; }
+
+  const costByStep = Object.fromEntries((costs || []).map(c => [c.step, c]));
+  const apiTotalAllTime = (costs || []).reduce((sum, c) => sum + Number(c.total_cost_all_time || 0), 0);
+  const apiTotalThisMonth = (costs || []).reduce((sum, c) => sum + Number(c.total_cost_this_month || 0), 0);
+  const infraTotalMonthly = (infra || []).reduce((sum, i) => sum + Number(i.monthly_cost || 0), 0);
+  const grandTotalThisMonth = apiTotalThisMonth + infraTotalMonthly;
+
+  summaryEl.innerHTML =
+    '<div class="cost-card"><div class="cc-value" style="color:var(--accent);">' + fmtUsd(grandTotalThisMonth) + '</div><div class="cc-label">Total Biaya Bulan Ini</div><div class="cc-sub">API + infra tetap</div></div>' +
+    '<div class="cost-card"><div class="cc-value">' + fmtUsd(apiTotalThisMonth) + '</div><div class="cc-label">API Pipeline Bulan Ini</div><div class="cc-sub">Claude + Replicate, otomatis</div></div>' +
+    '<div class="cost-card"><div class="cc-value">' + fmtUsd(infraTotalMonthly) + '</div><div class="cc-label">Infra Tetap / Bulan</div><div class="cc-sub">Diisi manual di bawah</div></div>' +
+    '<div class="cost-card"><div class="cc-value" style="color:var(--muted);">' + fmtUsd(apiTotalAllTime) + '</div><div class="cc-label">API Pipeline Sepanjang Waktu</div></div>';
+
+  const maxCost = Math.max(0.0001, ...SYSTEM_MAP.map(m => Number((costByStep[m.step] || {}).total_cost_all_time || 0)));
+
+  const rows = SYSTEM_MAP.filter(m => m.arch !== 'off').map(m => {
+    const c = costByStep[m.step];
+    if (!c || Number(c.run_count) === 0) {
+      return '<tr><td>' + esc(m.step) + ' &middot; ' + esc(m.name) + '</td><td class="num">-</td><td class="num" colspan="2" style="color:var(--muted-2);">belum ada run tercatat</td></tr>';
+    }
+    const allTime = Number(c.total_cost_all_time || 0);
+    const thisMonth = Number(c.total_cost_this_month || 0);
+    const pct = Math.max(2, Math.round((allTime / maxCost) * 100));
+    const gapNote = (allTime === 0 && Number(c.run_count) > 0)
+      ? '<div class="ct-gap">run tercatat tapi cost $0 - kemungkinan gap tracking, cek node job_runs stage ini</div>'
+      : '';
+    return '<tr>' +
+      '<td>' + esc(m.step) + ' &middot; ' + esc(m.name) + '</td>' +
+      '<td class="num">' + c.run_count + ' run</td>' +
+      '<td><div class="ct-bar-cell"><div class="ct-bar-track"><div class="ct-bar-fill" style="width:' + pct + '%;"></div></div></div>' + gapNote + '</td>' +
+      '<td class="num">' + fmtUsd(allTime) + '<div style="color:var(--muted-2);font-size:11px;">' + fmtUsd(thisMonth) + ' bulan ini</div></td>' +
+    '</tr>';
+  }).join('');
+
+  tableEl.innerHTML =
+    '<thead><tr><th>Stage</th><th class="num">Jumlah Run</th><th>Proporsi Biaya</th><th class="num">Total Biaya</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody>';
+
+  if (infraErr) { infraEl.innerHTML = '<div style="color:var(--red);">Gagal memuat biaya infra: ' + esc(infraErr.message) + '</div>'; return; }
+
+  infraEl.innerHTML = (infra || []).map(i =>
+    '<div class="infra-row">' +
+      '<span class="ir-cat">' + esc(i.category) + '</span>' +
+      '<span class="ir-name">' + esc(i.name) + '</span>' +
+      '<span class="ir-note" title="' + esc(i.note || '') + '">' + esc(i.note || '') + '</span>' +
+      '<input type="number" step="0.01" min="0" value="' + Number(i.monthly_cost || 0) + '" data-id="' + i.id + '" onchange="saveInfraCost(this)">' +
+      '<span class="ir-save" id="save-' + i.id + '">tersimpan</span>' +
+    '</div>'
+  ).join('') + '<p style="color:var(--muted-2);font-size:11px;margin-top:10px;">Angka biaya bulanan di atas diisi manual (cek billing masing-masing layanan) - otomatis tersimpan saat diubah.</p>';
+}
+
+window.saveInfraCost = async function(input) {
+  const id = input.dataset.id;
+  const value = parseFloat(input.value) || 0;
+  const { error } = await sb.from('infra_costs').update({ monthly_cost: value, updated_at: new Date().toISOString() }).eq('id', id);
+  const saveLabel = document.getElementById('save-' + id);
+  if (error) { showToast('Gagal simpan: ' + error.message, 'error'); return; }
+  if (saveLabel) {
+    saveLabel.classList.add('show');
+    setTimeout(() => saveLabel.classList.remove('show'), 1800);
+  }
+  loadCost();
+};
 
 async function loadInsights() {
   const el = document.getElementById('insights-view');

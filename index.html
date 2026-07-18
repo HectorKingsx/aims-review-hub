@@ -341,6 +341,40 @@
   .step-row.pending .step-dot { background: var(--panel); border-color: var(--border); color: var(--muted-2); }
   .step-row.pending .step-name { color: var(--muted-2); }
 
+  /* ---------- Home: system map ---------- */
+  .home-summary-strip { display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
+  .home-summary-card {
+    flex:1; min-width:140px; background: var(--panel); border:1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; animation: fadeInUp .2s ease both;
+  }
+  .home-summary-card .hs-value { font-size: 26px; font-weight: 800; line-height:1.1; }
+  .home-summary-card .hs-label { font-size: 11.5px; color: var(--muted-2); text-transform: uppercase; letter-spacing: .05em; margin-top:6px; font-weight:700; }
+
+  .system-map { display:flex; flex-direction:column; gap:8px; }
+  .map-row {
+    display:flex; align-items:center; gap:14px; padding: 14px 16px; border-radius: var(--radius); border:1px solid var(--border);
+    background: var(--panel); animation: fadeInUp .2s ease both; transition: border-color .15s ease;
+  }
+  .map-row:hover { border-color: var(--accent); }
+  .map-row .mr-dot {
+    width:12px; height:12px; border-radius:50%; flex-shrink:0; position:relative;
+  }
+  .map-row .mr-dot.pulse::after {
+    content:''; position:absolute; inset:-4px; border-radius:50%; border:2px solid currentColor; opacity:0.5;
+    animation: pulseRing 1.4s ease-out infinite;
+  }
+  @keyframes pulseRing { 0% { transform:scale(0.7); opacity:0.6; } 100% { transform:scale(1.8); opacity:0; } }
+  .map-row .mr-step { font-weight:800; font-size:13.5px; width:40px; flex-shrink:0; }
+  .map-row .mr-name { font-size:13px; color: var(--text); width:190px; flex-shrink:0; font-weight:600; }
+  .map-row .mr-arch { flex-shrink:0; }
+  .map-row .mr-detail { flex:1; font-size:12.5px; color: var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .map-row .mr-time { font-size:12px; color: var(--muted-2); flex-shrink:0; white-space:nowrap; }
+
+  .arch-badge { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:999px; text-transform:uppercase; letter-spacing:.02em; }
+  .arch-badge.live { background: var(--green-soft); color: var(--green); }
+  .arch-badge.weekly { background: var(--accent-soft); color: var(--accent); }
+  .arch-badge.off { background: var(--gray-soft); color: var(--gray); }
+
   .lightbox-overlay { position:fixed; inset:0; background: rgba(0,0,0,0.82); z-index:200; display:flex; align-items:center; justify-content:center; padding: 30px; animation: fadeIn .2s ease; }
   .lightbox-box { background: var(--bg-elev); border:1px solid var(--border); border-radius: var(--radius); max-width: 1020px; width:100%; max-height: 88vh; overflow-y:auto; padding: 26px 30px; animation: popIn .2s ease; position:relative; }
   .lightbox-close { position:absolute; top:18px; right:18px; }
@@ -369,7 +403,8 @@
   </div>
   <div class="header-right">
     <div class="tabs">
-      <button class="tab-btn active" id="tab-inbox" onclick="switchTab('inbox')">Inbox</button>
+      <button class="tab-btn active" id="tab-home" onclick="switchTab('home')">Home</button>
+      <button class="tab-btn" id="tab-inbox" onclick="switchTab('inbox')">Inbox</button>
       <button class="tab-btn" id="tab-not-recommended" onclick="switchTab('not_recommended')">Not Recommended</button>
       <button class="tab-btn" id="tab-produced" onclick="switchTab('produced')">Siap Publish</button>
       <button class="tab-btn" id="tab-pipeline" onclick="switchTab('pipeline')">Pipeline</button>
@@ -413,6 +448,11 @@
     </div>
   </div>
 </div>
+<div id="home-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);">
+  <div class="home-summary-strip" id="home-summary"></div>
+  <div class="section-label">Peta Sistem S1&ndash;S12</div>
+  <div class="system-map" id="system-map"></div>
+</div>
 <div id="pipeline-view" style="display:none; padding: 28px 36px; overflow-y:auto; height: calc(100vh - 61px);">
   <div class="section-label">Status Terakhir per Tahap</div>
   <div class="health-strip" id="health-strip"></div>
@@ -445,7 +485,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let items = [];
 let activeId = null;
-let currentTab = 'inbox';
+let currentTab = 'home';
 let currentQueueStatus = 'ready_for_review';
 let producedItems = [];
 
@@ -468,6 +508,7 @@ function showToast(msg, type) {
 
 function switchTab(tab) {
   currentTab = tab;
+  document.getElementById('tab-home').classList.toggle('active', tab === 'home');
   document.getElementById('tab-inbox').classList.toggle('active', tab === 'inbox');
   document.getElementById('tab-not-recommended').classList.toggle('active', tab === 'not_recommended');
   document.getElementById('tab-produced').classList.toggle('active', tab === 'produced');
@@ -475,6 +516,7 @@ function switchTab(tab) {
   document.getElementById('tab-insights').classList.toggle('active', tab === 'insights');
   const isQueueTab = (tab === 'inbox' || tab === 'not_recommended');
   document.getElementById('layout').style.display = isQueueTab ? 'flex' : 'none';
+  document.getElementById('home-view').style.display = tab === 'home' ? 'block' : 'none';
   document.getElementById('produced-view').style.display = tab === 'produced' ? 'block' : 'none';
   document.getElementById('pipeline-view').style.display = tab === 'pipeline' ? 'block' : 'none';
   document.getElementById('insights-view').style.display = tab === 'insights' ? 'block' : 'none';
@@ -484,6 +526,7 @@ function switchTab(tab) {
     document.getElementById('detail').innerHTML = '<div id="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>Pilih konten di sebelah kiri untuk mulai review.</div>';
     loadInbox();
   }
+  else if (tab === 'home') loadHome();
   else if (tab === 'produced') loadProduced();
   else if (tab === 'pipeline') loadPipeline();
   else loadInsights();
@@ -709,6 +752,82 @@ window.toggleDrill = async function(drillId, kind, key, totalCount) {
       '<span class="rr-dur">' + (r.duration_seconds != null ? r.duration_seconds + 's' : '-') + '</span>' +
       (r.error_excerpt ? '<span class="rr-err" title="' + esc(r.error_excerpt) + '">' + esc(r.error_excerpt) + '</span>' : '<span class="rr-meta" title="' + esc(meta) + '">' + esc(meta) + '</span>') +
       '</div>';
+  }).join('');
+}
+
+// ---------- Home: peta status sistem S1-S12 ----------
+const SYSTEM_MAP = [
+  { step: 'S1', name: 'Collector', arch: 'live', archLabel: 'Live · Chained', desc: 'Ambil berita dari sumber RSS' },
+  { step: 'S2', name: 'Filter', arch: 'live', archLabel: 'Live · Chained', desc: 'Label NEWS/CONTENT_IDEA + dedup' },
+  { step: 'S3', name: 'Scoring', arch: 'live', archLabel: 'Live · Chained', desc: 'Skor 7 dimensi + keputusan KEEP/DROP' },
+  { step: 'S4', name: 'Content Planning', arch: 'live', archLabel: 'Live · Chained', desc: 'Angle & outline konten' },
+  { step: 'S5', name: 'Content Drafting', arch: 'live', archLabel: 'Live · Chained', desc: 'Tulis carousel + QC faktual' },
+  { step: 'S6', name: 'Visual Planning', arch: 'live', archLabel: 'Live · Chained', desc: 'Visual brief + foto AI' },
+  { step: 'S7', name: 'Semi-Otomatis', arch: 'live', archLabel: 'Live · Chained', desc: 'Auto-approve skor >= ambang brand' },
+  { step: 'S8', name: 'Content Production', arch: 'live', archLabel: 'Live · Chained', desc: 'Render carousel final' },
+  { step: 'S9', name: 'Content Publishing', arch: 'off', archLabel: 'Dibangun · Nonaktif', desc: 'Posting ke platform (menunggu kredensial IG)' },
+  { step: 'S10', name: 'Performance Tracking', arch: 'off', archLabel: 'Dibangun · Nonaktif', desc: 'Metrik performa konten' },
+  { step: 'S11', name: 'System Learning', arch: 'off', archLabel: 'Dibangun · Nonaktif', desc: 'Insight top/low performer mingguan' },
+  { step: 'S12', name: 'Weekly System Check', arch: 'weekly', archLabel: 'Live · Mingguan', desc: 'Cek kesehatan sistem tiap Senin 07:00' }
+];
+
+async function loadHome() {
+  const summaryEl = document.getElementById('home-summary');
+  const mapEl = document.getElementById('system-map');
+  summaryEl.innerHTML = '';
+  mapEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Memuat status sistem...</div>';
+
+  const { data: statuses, error } = await sb.from('pipeline_step_status').select('*');
+  if (error) { mapEl.innerHTML = '<div style="color:var(--red);">Gagal memuat: ' + esc(error.message) + '</div>'; return; }
+
+  const statusByStep = Object.fromEntries((statuses || []).map(s => [s.step, s]));
+
+  const liveCount = SYSTEM_MAP.filter(m => m.arch === 'live').length;
+  const runningNow = (statuses || []).filter(s => s.is_running).length;
+  const failedRecent = (statuses || []).filter(s => s.last_status === 'partial' || s.last_status === 'failed' || s.last_status === 'blocked_qc').length;
+
+  summaryEl.innerHTML =
+    '<div class="home-summary-card"><div class="hs-value" style="color:var(--green);">' + liveCount + '/12</div><div class="hs-label">Stage Live &amp; Chained</div></div>' +
+    '<div class="home-summary-card"><div class="hs-value" style="color:' + (runningNow > 0 ? 'var(--accent)' : 'var(--muted-2)') + ';">' + runningNow + '</div><div class="hs-label">Sedang Berjalan Sekarang</div></div>' +
+    '<div class="home-summary-card"><div class="hs-value" style="color:' + (failedRecent > 0 ? 'var(--amber)' : 'var(--green)') + ';">' + failedRecent + '</div><div class="hs-label">Butuh Perhatian (Run Terakhir)</div></div>';
+
+  mapEl.innerHTML = SYSTEM_MAP.map((m, i) => {
+    const s = statusByStep[m.step];
+    let dotColor = 'var(--gray)';
+    let pulse = false;
+    let timeLabel = 'belum ada data';
+    let detail = m.desc;
+
+    if (m.arch === 'off') {
+      dotColor = 'var(--gray)';
+      timeLabel = 'nonaktif';
+    } else if (s) {
+      if (s.is_running) {
+        dotColor = 'var(--accent)';
+        pulse = true;
+        timeLabel = 'sedang berjalan · mulai ' + relativeTime(s.last_started_at);
+      } else if (s.last_status === 'success') {
+        dotColor = 'var(--green)';
+        timeLabel = 'selesai ' + relativeTime(s.last_finished_at);
+      } else if (s.last_status === 'partial' || s.last_status === 'blocked_qc') {
+        dotColor = 'var(--amber)';
+        timeLabel = 'selesai ' + relativeTime(s.last_finished_at) + ' · ' + esc(s.last_status);
+      } else if (s.last_status === 'failed') {
+        dotColor = 'var(--red)';
+        timeLabel = 'gagal ' + relativeTime(s.last_finished_at);
+      } else {
+        timeLabel = relativeTime(s.last_finished_at || s.last_started_at);
+      }
+    }
+
+    return '<div class="map-row" style="animation-delay:' + (i * 0.025) + 's;">' +
+      '<span class="mr-dot' + (pulse ? ' pulse' : '') + '" style="background:' + dotColor + ';color:' + dotColor + ';"></span>' +
+      '<span class="mr-step">' + esc(m.step) + '</span>' +
+      '<span class="mr-name">' + esc(m.name) + '</span>' +
+      '<span class="mr-arch"><span class="arch-badge ' + m.arch + '">' + esc(m.archLabel) + '</span></span>' +
+      '<span class="mr-detail">' + esc(detail) + '</span>' +
+      '<span class="mr-time">' + esc(timeLabel) + '</span>' +
+    '</div>';
   }).join('');
 }
 
@@ -1198,7 +1317,7 @@ async function doDownload(contentItemId) {
   await sb.schema('s7').from('review_actions').insert({ content_item_id: contentItemId, action: 'download' });
 }
 
-switchTab('inbox');
+switchTab('home');
 </script>
 </body>
 </html>

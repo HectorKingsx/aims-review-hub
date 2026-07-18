@@ -875,7 +875,10 @@ async function loadHome() {
 // Stage yang seharusnya punya biaya API tapi field cost_estimate-nya belum/tidak dihitung di kode n8n.
 // Dipertahankan sebagai daftar eksplisit supaya gap tracking baru di masa depan gampang ketahuan
 // (misal kalau S9 nanti aktif dan pakai API berbayar tapi lupa dihitung).
-const KNOWN_COST_GAPS = {}; // kosong sejak fix S6 2026-07-18 - isi lagi kalau ditemukan gap baru
+// Stage yang MEMANG memanggil API berbayar (Claude/Replicate) - kalau cost-nya $0 di sini,
+// itu tanda gap tracking beneran. Stage lain (S1 fetch RSS gratis, S7/S12 murni query DB,
+// S8 pakai Supabase Edge Function bukan API per-token) WAJAR $0 - jangan tampilkan warning.
+const STAGES_WITH_PAID_API = ['S2', 'S3', 'S4', 'S5', 'S6'];
 
 function fmtUsd(n) {
   const v = Number(n) || 0;
@@ -919,9 +922,9 @@ async function loadCost() {
     const allTime = Number(c.total_cost_all_time || 0);
     const thisMonth = Number(c.total_cost_this_month || 0);
     const pct = Math.max(2, Math.round((allTime / maxCost) * 100));
-    const gapNote = (allTime === 0 && Number(c.run_count) > 0)
+    const gapNote = (allTime === 0 && Number(c.run_count) > 0 && STAGES_WITH_PAID_API.includes(m.step))
       ? '<div class="ct-gap">run tercatat tapi cost $0 - kemungkinan gap tracking, cek node job_runs stage ini</div>'
-      : '';
+      : (allTime === 0 ? '<div style="color:var(--muted-2);font-size:11px;">gratis by design (bukan API berbayar)</div>' : '');
     return '<tr>' +
       '<td>' + esc(m.step) + ' &middot; ' + esc(m.name) + '</td>' +
       '<td class="num">' + c.run_count + ' run</td>' +
